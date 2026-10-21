@@ -126,8 +126,8 @@
         </div>
         <div>
           <label for="sDays">Count an ad as running if seen in the last</label>
-          <select id="sDays"><option>7</option><option>14</option><option>30</option><option>60</option><option>90</option></select>
-          <div class="hint">days</div>
+          <select id="sDays"><option value="1">1 (today)</option><option>7</option><option>14</option><option>30</option><option>60</option><option>90</option></select>
+          <div class="hint">days. 1 = only advertisers running today; older ones still show on this page.</div>
         </div>
         <div>
           <label for="sShots">Screenshots per new advertiser</label>
@@ -178,6 +178,10 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  function windowText(days) {
+    return Number(days) === 1 ? 'today' : 'in the last ' + days + ' days';
+  }
+
   function ago(iso) {
     if (!iso) return '';
     var s = (Date.now() - Date.parse(iso)) / 1000;
@@ -266,9 +270,9 @@
     if (!r) return '<div class="notice n-blue">Never scanned. Press <b>Test scan</b> to see who is advertising to ' + esc(t.domain) + '.</div>';
     if (!r.ok) return '<div class="notice n-red"><b>Last scan failed</b> (' + esc(ago(r.scannedAt)) + '): ' + esc(r.error) + '</div>';
     var html = '<div class="stats">' +
-      '<div class="stat"><b>' + r.totalAdvertisers + '</b><span>advertisers in the last ' + r.activeWithinDays + ' days</span></div>' +
+      '<div class="stat"><b>' + r.totalAdvertisers + '</b><span>advertisers ' + windowText(r.activeWithinDays) + '</span></div>' +
       '<div class="stat"><b style="color:var(--' + (r.unauthorized ? 'red' : 'green') + ')">' + r.unauthorized + '</b><span>not authorized</span></div>' +
-      '<div class="stat"><b>' + r.totalAds + '</b><span>ads in the last ' + r.activeWithinDays + ' days</span></div>' +
+      '<div class="stat"><b>' + r.totalAds + '</b><span>ads ' + windowText(r.activeWithinDays) + '</span></div>' +
       (r.totalAllTime != null ? '<div class="stat"><b>' + (r.advertisers || []).length + '</b><span>advertisers ever (' + r.totalAllTime + ' ads)</span></div>' : '') +
       '</div><div class="small muted">Last ' + (r.dryRun ? 'test scan' : 'scan') + ' ' + esc(ago(r.scannedAt)) +
       (r.truncated ? ' · <span class="badge b-amber">partial list</span>' : '') + '</div>';
@@ -285,7 +289,7 @@
       var badge = a.official
         ? '<span class="badge b-green">Official</span>' + (isPinned ? '' : ' <span class="badge b-amber" title="Matched by name only">by name</span>')
         : '<span class="badge ' + (active ? 'b-red' : 'b-grey') + '">Not authorized</span>' + (a.isNew && !r.dryRun && active ? ' <span class="badge b-blue">New</span>' : '');
-      if (!active) badge += ' <span class="badge b-grey" title="Google lists this advertiser, but none of its ads ran in the window">Not in last ' + r.activeWithinDays + ' days</span>';
+      if (!active) badge += ' <span class="badge b-grey" title="Google lists this advertiser, but none of its ads ran in the window">Not running ' + windowText(r.activeWithinDays) + '</span>';
       var action = isPinned
         ? '<button class="link" data-act="unpin" data-id="' + esc(a.id) + '" data-domain="' + esc(t.domain) + '">Not the client</button>'
         : '<button class="link" data-act="pin" data-id="' + esc(a.id) + '" data-name="' + esc(a.name) + '" data-domain="' + esc(t.domain) + '">This is the client</button>';

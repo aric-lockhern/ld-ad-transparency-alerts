@@ -19,6 +19,11 @@ function day(iso) {
   return iso ? iso.slice(0, 10) : 'unknown';
 }
 
+// "today" for the 1-day window the daily report uses; "the last N days" otherwise.
+export function windowText(days) {
+  return Number(days) === 1 ? 'today (last 24 hours)' : `in the last ${days} days`;
+}
+
 function plural(n, one, many = `${one}s`) {
   return `${n} ${n === 1 ? one : many}`;
 }
@@ -39,7 +44,7 @@ export function summaryMessage(report, { region, truncated }) {
   const lines = [];
 
   if (!unofficial.length) {
-    lines.push(`:white_check_mark: *${esc(target.domain)}* — no unauthorized advertisers in the last ${report.activeWindow} days.`);
+    lines.push(`:white_check_mark: *${esc(target.domain)}* — no unauthorized advertisers ${windowText(report.activeWindow)}.`);
     lines.push(`${plural(report.totalAdvertisers, 'advertiser')} running ads to ${site}: ${official.map((a) => esc(a.advertiserName)).join(', ') || 'none'}.`);
   } else {
     const icon = newUnofficial.length ? ':rotating_light:' : ':warning:';
@@ -48,7 +53,7 @@ export function summaryMessage(report, { region, truncated }) {
       : `${plural(unofficial.length, 'unauthorized advertiser')} still running on *${esc(target.domain)}*`;
     lines.push(`${icon} ${headline}`);
     lines.push(
-      `${plural(report.totalAdvertisers, 'advertiser')} ran ads pointing to ${site} in the last ${report.activeWindow} days — ` +
+      `${plural(report.totalAdvertisers, 'advertiser')} ran ads pointing to ${site} ${windowText(report.activeWindow)} — ` +
         `${official.length} official, *${unofficial.length} not authorized*.`,
     );
     lines.push('');

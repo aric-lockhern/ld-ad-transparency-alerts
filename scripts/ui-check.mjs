@@ -96,7 +96,7 @@ async function run(width, height, name) {
   await page.waitForSelector('.client');
   assert.match(await page.textContent('.client'), /2 not authorized/);
   assert.match(await page.textContent('.client'), /matched by name only/);
-  assert.match(await page.textContent('.client'), /Sapphire Media Group LLC[\s\S]*Not in last 7 days/);
+  assert.match(await page.textContent('.client'), /Sapphire Media Group LLC[\s\S]*Not running in the last 7 days/);
   await page.screenshot({ path: `${OUT}${name}-1-client.png`, fullPage: true });
 
   // Pin the official account from the table.

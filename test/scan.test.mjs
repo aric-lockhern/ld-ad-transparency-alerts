@@ -174,3 +174,14 @@ test('ad text cleaner drops page chrome and duplicates', () => {
   const t = cleanAdText(['Sponsored\nDirectMeds® Official Site\nDirectMeds® Official Site\nSee all ads', 'Last shown']);
   assert.equal(t, 'Sponsored\nDirectMeds® Official Site');
 });
+
+test('a 1-day window lists only today\'s advertisers and says "today"', async () => {
+  const { creatives } = await scan();
+  // NOW is 1761000000; Rx Savings last shown 1760990000 (~3 h before), Direct Meds 1760900000 (~28 h before).
+  const r = buildReport({ target, creatives, prevState: null, now: NOW, activeWithinDays: 1 });
+  assert.deepEqual(r.unofficial.map((a) => a.advertiserName).sort(), ['Meds Deals <Co> | Ltd', 'Rx Savings Partners Inc']);
+  assert.equal(r.official.length, 0, 'the official account last ran 28 hours ago');
+  const msg = summaryMessage(r, { region: 'US', truncated: false });
+  assert.match(msg, /directmeds\.com> today \(last 24 hours\)/);
+  assert.doesNotMatch(msg, /Old Affiliate|Direct Meds LLC/);
+});
