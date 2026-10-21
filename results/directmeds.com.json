@@ -2,28 +2,73 @@
   "domain": "directmeds.com",
   "name": "DirectMeds",
   "ok": true,
-  "scannedAt": "2026-10-21T17:53:37.843Z",
+  "scannedAt": "2026-10-21T17:56:21.193Z",
   "dryRun": true,
   "truncated": false,
-  "activeWithinDays": 7,
-  "totalAdvertisers": 1,
-  "totalAds": 7,
-  "unauthorized": 1,
-  "newUnauthorized": 1,
+  "activeWithinDays": 30,
+  "totalAdvertisers": 2,
+  "totalAds": 11,
+  "unauthorized": 2,
+  "newUnauthorized": 2,
+  "totalAllTime": 17,
   "advertisers": [
     {
       "id": "AR11773855283737001985",
       "name": "Idea Clan , Inc",
       "official": false,
       "isNew": true,
-      "ads": 7,
-      "newAds": 7,
+      "ads": 8,
+      "newAds": 8,
       "formats": [
         "image",
         "video"
       ],
       "lastShown": "2026-10-20T22:43:39.000Z",
-      "url": "https://adstransparency.google.com/advertiser/AR11773855283737001985?region=US"
+      "url": "https://adstransparency.google.com/advertiser/AR11773855283737001985?region=US",
+      "active": true
+    },
+    {
+      "id": "AR01465552251392098305",
+      "name": "Vendom",
+      "official": false,
+      "isNew": true,
+      "ads": 3,
+      "newAds": 3,
+      "formats": [
+        "image"
+      ],
+      "lastShown": "2026-10-13T10:59:33.000Z",
+      "url": "https://adstransparency.google.com/advertiser/AR01465552251392098305?region=US",
+      "active": true
+    },
+    {
+      "id": "AR03159450106978107393",
+      "name": "Direct Meds LLC",
+      "official": true,
+      "isNew": false,
+      "ads": 2,
+      "newAds": 0,
+      "formats": [
+        "image"
+      ],
+      "lastShown": "2026-08-11T00:18:08.000Z",
+      "url": "https://adstransparency.google.com/advertiser/AR03159450106978107393?region=US",
+      "active": false
+    },
+    {
+      "id": "AR00543458507068801025",
+      "name": "Sapphire Media Group LLC",
+      "official": false,
+      "isNew": false,
+      "ads": 4,
+      "newAds": 0,
+      "formats": [
+        "video",
+        "image"
+      ],
+      "lastShown": "2026-06-01T17:09:30.000Z",
+      "url": "https://adstransparency.google.com/advertiser/AR00543458507068801025?region=US",
+      "active": false
     }
   ]
 }
