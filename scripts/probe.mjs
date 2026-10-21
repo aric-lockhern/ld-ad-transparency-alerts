@@ -59,6 +59,15 @@ try {
   for (const c of captured) {
     console.log(`- ${c.url.replace(/\?.*/, '')}\n    body: ${JSON.stringify(c.body)}\n    -> ${summarise(c.json)}`);
   }
+  const sample = captured.find((c) => c.url.includes('SearchCreatives') && c.json && Array.isArray(c.json[1]));
+  if (sample) {
+    console.log(`\nTop-level fields other than the ad list: ${JSON.stringify({ ...sample.json, 1: undefined })}`);
+    console.log('Every ad in the response (advertiser | format | first shown | last shown | raw keys):');
+    for (const raw of sample.json[1]) {
+      const c = parseSearchResponse({ 1: [raw] }).creatives[0];
+      console.log(`  ${c.advertiserName} | ${c.format} | ${c.firstShown} | ${c.lastShown} | keys ${Object.keys(raw).join(',')} | 6=${JSON.stringify(raw[6])} 7=${JSON.stringify(raw[7])}`);
+    }
+  }
   await writeFile(`${OUT}/captured.json`, JSON.stringify(captured.map(({ headers, ...rest }) => rest), null, 2));
 
   const first = captured.find((c) => c.url.includes('SearchCreatives') && JSON.stringify(c.body).includes(domain));
