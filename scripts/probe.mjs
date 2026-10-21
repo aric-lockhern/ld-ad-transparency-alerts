@@ -55,9 +55,33 @@ try {
     console.log(`Runner public IP: ${await ip.text()}`);
   } catch {}
 
+  // Click "See all ads" the way a person does (it may be a link, a button or
+  // plain text), then scroll whatever it opens and record what changes.
+  const before = captured.length;
+  const seeAll = page.getByText(/^\s*see all ads\s*$/i).first();
+  if (await seeAll.count()) {
+    console.log(`\nClicking "See all ads" (tag: ${await seeAll.evaluate((n) => n.tagName)})`);
+    await seeAll.click({ timeout: 5000 }).catch((e) => console.log(`click failed: ${e.message.split('\n')[0]}`));
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForTimeout(3000);
+    console.log(`URL after click: ${page.url()}`);
+    for (let i = 0; i < 8; i++) {
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await page.waitForTimeout(1500);
+    }
+    const after = await page.evaluate(() => document.body.innerText);
+    console.log(`Printed count after click: ${parseShownCount(after)}`);
+    console.log(`Page text after click (first 800 chars):\n${after.slice(0, 800)}\n`);
+    await page.screenshot({ path: `${OUT}/after-see-all.png`, fullPage: true });
+    console.log(`Requests sent after the click: ${captured.length - before}`);
+  } else {
+    console.log('\nNo "See all ads" control found on the page.');
+  }
+
   console.log(`\nRPC requests the page sent (${captured.length}):`);
   for (const c of captured) {
-    console.log(`- ${c.url.replace(/\?.*/, '')}\n    body: ${JSON.stringify(c.body)}\n    -> ${summarise(c.json)}`);
+    const totals = c.json && !Array.isArray(c.json) ? ` totals 4=${JSON.stringify(c.json[4])} 5=${JSON.stringify(c.json[5])}` : '';
+    console.log(`- ${c.url.replace(/\?.*/, '')}\n    body: ${JSON.stringify(c.body)}\n    -> ${summarise(c.json)}${totals}`);
   }
   const sample = captured.find((c) => c.url.includes('SearchCreatives') && c.json && Array.isArray(c.json[1]));
   if (sample) {
