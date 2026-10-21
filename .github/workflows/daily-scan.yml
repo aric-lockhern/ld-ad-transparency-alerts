@@ -1,20 +1,28 @@
 name: Daily ad transparency scan
+run-name: ${{ github.event_name == 'schedule' && 'Daily scan' || format('{0} · {1}', inputs.mode, inputs.target || 'all clients') }}
 
 # Midday US Eastern. GitHub cron is UTC only, so both offsets are scheduled
 # and the guard step runs exactly one of them: 16:03 UTC is noon in EDT,
 # 17:03 UTC is noon in EST. It keys on which cron fired, not on the clock,
 # because GitHub often starts scheduled runs late and a clock check would
 # then skip the day.
+#
+# Manual runs come from the setup page (or the Run workflow button here).
 on:
   schedule:
     - cron: '3 16 * * *'
     - cron: '3 17 * * *'
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: 'Dry run (print Slack messages, post nothing, save nothing)'
-        type: boolean
-        default: false
+      mode:
+        description: 'scan = post to Slack · dry-run = scan, post nothing · slack-test = post a "connected" line, no scan'
+        type: choice
+        options: [dry-run, scan, slack-test]
+        default: dry-run
+      target:
+        description: 'One client domain (blank = every enabled client)'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -56,7 +64,9 @@ jobs:
         if: steps.guard.outputs.run == 'true'
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          if [ "$MODE" != "slack-test" ]; then npx playwright install --with-deps chromium; fi
+        env:
+          MODE: ${{ inputs.mode || 'scan' }}
 
       - name: Test
         if: steps.guard.outputs.run == 'true'
@@ -65,11 +75,17 @@ jobs:
       - name: Scan and alert
         if: steps.guard.outputs.run == 'true'
         env:
+          MODE: ${{ inputs.mode || 'scan' }}
+          TARGET: ${{ inputs.target }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          SLACK_CHANNEL_DIRECTMEDS: ${{ secrets.SLACK_CHANNEL_DIRECTMEDS }}
           SLACK_ERROR_CHANNEL: ${{ secrets.SLACK_ERROR_CHANNEL }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: npm run scan -- ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: |
+          flags=""
+          [ "$MODE" = "dry-run" ] && flags="--dry-run"
+          [ "$MODE" = "slack-test" ] && flags="--slack-test"
+          [ -n "$TARGET" ] && flags="$flags --only=$TARGET"
+          node src/run.mjs $flags
 
       - name: Keep screenshots and reports
         if: always() && steps.guard.outputs.run == 'true'
@@ -80,13 +96,20 @@ jobs:
           retention-days: 90
           if-no-files-found: ignore
 
-      # The seen-advertiser history is what makes "NEW" mean new. Committed
-      # so it survives between runs and its history is readable in git.
-      - name: Save state
-        if: success() && steps.guard.outputs.run == 'true' && !inputs.dry_run
+      # results/ is what the setup page shows, so it is saved even when a
+      # client failed (the failure is in the file). state/ is the
+      # seen-advertiser history that makes "NEW" mean new; it only changes on
+      # a real scan, and the scanner only writes it after a successful post.
+      - name: Save results and state
+        if: always() && steps.guard.outputs.run == 'true' && inputs.mode != 'slack-test'
         run: |
           git config user.name "ad-transparency-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add state/
-          git diff --cached --quiet || git commit -m "State: daily scan $(date -u +%F)"
-          git push
+          git add results/ state/ 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Scan results $(date -u +%F)"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+            sleep $((i * 5))
+          done
+          exit 1

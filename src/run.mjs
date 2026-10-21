@@ -1,10 +1,16 @@
-// Daily scan: for each target domain, list every advertiser Google shows
+// Daily scan: for each client domain, list every advertiser Google shows
 // running ads to it, flag anyone who is not the official account, and post to
 // the client's Slack channel with screenshots of the new ones.
 //
-//   node src/run.mjs                 scan, post, save state
-//   node src/run.mjs --dry-run       scan, print the Slack messages, save nothing
+//   node src/run.mjs                      scan every enabled client, post, save state
+//   node src/run.mjs --dry-run            scan, print the Slack messages, post nothing
+//   node src/run.mjs --slack-test         post a "connected" line to each channel, no scan
+//   node src/run.mjs --only=directmeds.com
 //   node src/run.mjs --no-screenshots
+//
+// Every scan, dry or real, writes results/<domain>.json. That file is what the
+// setup page shows — including the advertiser IDs needed to pin the official
+// account — so a dry run is useful from the page, not only from the log.
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -12,11 +18,15 @@ import { fileURLToPath } from 'node:url';
 import { searchDomain } from './transparency.mjs';
 import { buildReport, nextState } from './classify.mjs';
 import { summaryMessage, creativeReply, Slack } from './slack.mjs';
+import { validateConfig, resultFileName } from './config.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const args = new Set(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const args = new Set(argv);
 const DRY = args.has('--dry-run');
-const SHOTS = !args.has('--no-screenshots');
+const SLACK_TEST = args.has('--slack-test');
+const SHOTS = !args.has('--no-screenshots') && !SLACK_TEST;
+const ONLY = (argv.find((a) => a.startsWith('--only=')) || '').slice(7).trim().toLowerCase();
 
 async function readJson(file, fallback) {
   try {
@@ -27,8 +37,11 @@ async function readJson(file, fallback) {
   }
 }
 
-function stateFile(target) {
-  return path.join(ROOT, 'state', `${target.domain.replace(/[^a-z0-9.-]/gi, '_')}.json`);
+const stateFile = (t) => path.join(ROOT, 'state', resultFileName(t.domain));
+const resultFile = (t) => path.join(ROOT, 'results', resultFileName(t.domain));
+
+export function channelFor(target, env = process.env) {
+  return target.slackChannelId || (target.slackChannelEnv && env[target.slackChannelEnv]) || '';
 }
 
 // New advertisers first, then new ads from known ones; text ads first within
@@ -44,23 +57,68 @@ export function pickCaptures(report, perAdvertiser, perRun) {
   return picks.slice(0, perRun);
 }
 
+// What the setup page shows for a client. Small on purpose: it is committed
+// every day, and the full report with every creative is in the run artifact.
+export function resultSummary(report, { dryRun, truncated, now = Date.now() }) {
+  const row = (a) => ({
+    id: a.advertiserId,
+    name: a.advertiserName,
+    official: a.official,
+    isNew: a.isNew,
+    ads: a.creatives.length,
+    newAds: a.newCreatives.length,
+    formats: [...new Set(a.creatives.map((c) => c.format))],
+    lastShown: a.lastShown,
+    url: a.creatives[0].url.replace(/\/creative\/[^?]+/, ''),
+  });
+  return {
+    ok: true,
+    scannedAt: new Date(now).toISOString(),
+    dryRun: Boolean(dryRun),
+    truncated: Boolean(truncated),
+    activeWithinDays: report.activeWindow,
+    totalAdvertisers: report.totalAdvertisers,
+    totalAds: report.totalCreatives,
+    unauthorized: report.unofficial.length,
+    newUnauthorized: report.newUnofficial.length,
+    advertisers: [...report.official, ...report.unofficial].map(row),
+  };
+}
+
+async function writeResult(target, body) {
+  await mkdir(path.join(ROOT, 'results'), { recursive: true });
+  await writeFile(resultFile(target), JSON.stringify({ domain: target.domain, name: target.name, ...body }, null, 2) + '\n');
+}
+
+async function slackTest(target, slack) {
+  const channel = channelFor(target);
+  if (!channel) throw new Error(`no Slack channel ID set for ${target.name}`);
+  await slack.post(
+    channel,
+    `:white_check_mark: Ad transparency alerts are connected for *${target.domain}*. ` +
+      `A daily report on who is advertising to this site will arrive here around noon Eastern.`,
+  );
+  console.log(`${target.domain}: Slack test posted`);
+}
+
 async function scanTarget(target, config, slack, browserCtx) {
   const region = config.region || 'US';
-  const channel = process.env[target.slackChannelEnv] || target.slackChannelId;
-  if (!DRY && !channel) throw new Error(`${target.domain}: no Slack channel — set ${target.slackChannelEnv}`);
+  const channel = channelFor(target);
+  // A client added on the page but not wired to Slack yet is skipped, not
+  // failed: "Test scan" works without a channel, and the page says why the
+  // daily report is not arriving.
+  if (!DRY && !channel) {
+    console.log(`${target.domain}: skipped — no Slack channel ID yet`);
+    return;
+  }
 
   const prevState = await readJson(stateFile(target), null);
   const { creatives, truncated } = await searchDomain({
     domain: target.domain,
     region,
-    max: config.maxCreativesPerTarget || 2000,
+    max: config.maxCreativesPerTarget,
   });
-  const report = buildReport({
-    target,
-    creatives,
-    prevState,
-    activeWithinDays: config.activeWithinDays || 7,
-  });
+  const report = buildReport({ target, creatives, prevState, activeWithinDays: config.activeWithinDays });
 
   console.log(
     `${target.domain}: ${creatives.length} creatives, ${report.totalAdvertisers} active advertisers, ` +
@@ -76,7 +134,7 @@ async function scanTarget(target, config, slack, browserCtx) {
 
   const shouldPost = report.unofficial.length || config.postWhenClean;
   const summary = summaryMessage(report, { region, truncated });
-  const captures = SHOTS && browserCtx ? pickCaptures(report, config.maxScreenshotsPerAdvertiser || 3, config.maxScreenshotsPerRun || 25) : [];
+  const captures = SHOTS && browserCtx ? pickCaptures(report, config.maxScreenshotsPerAdvertiser, config.maxScreenshotsPerRun) : [];
 
   let threadTs = null;
   if (shouldPost) {
@@ -104,14 +162,27 @@ async function scanTarget(target, config, slack, browserCtx) {
     }
   }
 
-  // State moves only after the post, so a failed Slack call means tomorrow
-  // still reports these as new rather than silently swallowing them.
+  await writeResult(target, resultSummary(report, { dryRun: DRY, truncated }));
+  // State moves only after a real post, so a failed Slack call means tomorrow
+  // still reports these as new rather than silently swallowing them, and a
+  // dry run never uses up the "new" that the first real report should show.
   if (!DRY) await writeFile(stateFile(target), JSON.stringify(nextState(prevState, creatives), null, 2) + '\n');
-  return report;
 }
 
 async function main() {
-  const config = await readJson(path.join(ROOT, 'config.json'));
+  const { config, errors } = validateConfig(await readJson(path.join(ROOT, 'config.json'), {}));
+  if (errors.length) throw new Error(`config.json is invalid:\n  ${errors.join('\n  ')}`);
+
+  let targets = config.targets.filter((t) => t.enabled);
+  if (ONLY) {
+    targets = config.targets.filter((t) => t.domain === ONLY);
+    if (!targets.length) throw new Error(`No client with domain ${ONLY} in config.json`);
+  }
+  if (!targets.length) {
+    console.log('No enabled clients to scan.');
+    return;
+  }
+
   const token = process.env.SLACK_BOT_TOKEN;
   if (!DRY && !token) throw new Error('SLACK_BOT_TOKEN is not set (use --dry-run to test without Slack)');
   const slack = token ? new Slack(token) : null;
@@ -125,12 +196,16 @@ async function main() {
 
   const failures = [];
   try {
-    for (const target of config.targets) {
+    for (const target of targets) {
       try {
-        await scanTarget(target, config, slack, context);
+        if (SLACK_TEST) await slackTest(target, slack);
+        else await scanTarget(target, config, slack, context);
       } catch (err) {
         console.error(`${target.domain}: ${err.stack || err}`);
         failures.push(`${target.domain}: ${err.message}`);
+        // The page shows this instead of yesterday's numbers, which would
+        // otherwise read as a scan that worked.
+        if (!SLACK_TEST) await writeResult(target, { ok: false, scannedAt: new Date().toISOString(), dryRun: DRY, error: err.message });
       }
     }
   } finally {
@@ -151,7 +226,7 @@ async function main() {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((err) => {
-    console.error(err);
+    console.error(err.message || err);
     process.exit(1);
   });
 }

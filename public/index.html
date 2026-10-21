@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ad Transparency Alerts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0E2970;
+    --blue: #317AE0;
+    --blue-soft: #E8F0FC;
+    --ink: #1A2233;
+    --muted: #5B6578;
+    --line: #DDE2EA;
+    --bg: #F4F6FA;
+    --card: #FFFFFF;
+    --red: #C62C2C;
+    --red-soft: #FCEBEB;
+    --amber: #A86200;
+    --amber-soft: #FFF3E0;
+    --green: #1D7A46;
+    --green-soft: #E6F4EC;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 'DM Sans', system-ui, sans-serif; }
+  h1, h2, h3 { font-family: Montserrat, sans-serif; margin: 0; }
+  header { background: var(--navy); color: #fff; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; font-weight: 800; letter-spacing: .2px; }
+  header .sub { opacity: .8; font-size: 13px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .between { justify-content: space-between; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  button { font: 600 14px 'DM Sans', sans-serif; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 8px 14px; cursor: pointer; }
+  button:hover { border-color: var(--blue); }
+  button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  button.danger { color: var(--red); }
+  button.link { border: 0; background: none; color: var(--blue); padding: 4px 6px; }
+  button:disabled { opacity: .5; cursor: default; }
+  input, textarea, select { font: 15px 'DM Sans', sans-serif; width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+  textarea { min-height: 64px; resize: vertical; }
+  label { display: block; font-weight: 700; font-size: 13px; margin: 0 0 4px; }
+  .hint { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 99px; }
+  .b-red { background: var(--red-soft); color: var(--red); }
+  .b-green { background: var(--green-soft); color: var(--green); }
+  .b-amber { background: var(--amber-soft); color: var(--amber); }
+  .b-blue { background: var(--blue-soft); color: var(--blue); }
+  .b-grey { background: var(--bg); color: var(--muted); }
+  .client h2 { font-size: 18px; }
+  .stats { display: flex; gap: 24px; flex-wrap: wrap; margin: 14px 0 4px; }
+  .stat b { display: block; font: 800 24px Montserrat, sans-serif; }
+  .stat span { font-size: 12.5px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  th { text-align: left; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  td code { font-size: 12px; color: var(--muted); }
+  .tablewrap { overflow-x: auto; }
+  .notice { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-top: 12px; }
+  .n-red { background: var(--red-soft); color: var(--red); }
+  .n-amber { background: var(--amber-soft); color: var(--amber); }
+  .n-blue { background: var(--blue-soft); color: var(--navy); }
+  .pin { max-width: 360px; margin: 80px auto; text-align: center; }
+  .pin input { text-align: center; font-size: 22px; letter-spacing: 6px; margin: 14px 0; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--navy); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; max-width: calc(100% - 32px); z-index: 10; }
+  .toast.err { background: var(--red); }
+  .runs li { list-style: none; padding: 7px 0; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+  .runs { padding: 0; margin: 10px 0 0; }
+  ol.steps { margin: 8px 0 0; padding-left: 20px; }
+  ol.steps li { margin-bottom: 8px; }
+  details summary { cursor: pointer; font-weight: 700; }
+  .hidden { display: none !important; }
+  .edit { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
+  .check { display: flex; gap: 8px; align-items: center; font-weight: 500; font-size: 14px; }
+  .check input { width: auto; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Ad Transparency Alerts</h1>
+    <div class="sub">Who else is running Google ads to your clients' websites</div>
+  </div>
+  <div class="row" id="topActions" style="display:none">
+    <button id="addClient" class="primary">+ Add client</button>
+  </div>
+</header>
+
+<div id="pinView" class="pin card">
+  <h2>Enter PIN</h2>
+  <input id="pinInput" type="password" inputmode="numeric" autocomplete="current-password" aria-label="PIN">
+  <button id="pinGo" class="primary" style="width:100%">Open</button>
+  <div id="pinErr" class="notice n-red hidden"></div>
+</div>
+
+<div id="app" class="wrap hidden">
+  <div id="loadErr" class="notice n-red hidden"></div>
+  <div id="clients"></div>
+
+  <div class="card">
+    <div class="row between">
+      <h3>Recent runs</h3>
+      <button class="link" id="refreshRuns">Refresh</button>
+    </div>
+    <ul class="runs" id="runs"><li class="muted">Loading…</li></ul>
+  </div>
+
+  <div class="card">
+    <details id="settingsBox">
+      <summary>Settings for all clients</summary>
+      <div class="grid" style="margin-top:14px">
+        <div>
+          <label for="sRegion">Region</label>
+          <select id="sRegion">
+            <option value="US">United States</option><option value="CA">Canada</option>
+            <option value="GB">United Kingdom</option><option value="AU">Australia</option>
+            <option value="anywhere">Anywhere</option>
+          </select>
+          <div class="hint">Which country's ads to look at.</div>
+        </div>
+        <div>
+          <label for="sDays">Count an ad as running if seen in the last</label>
+          <select id="sDays"><option>3</option><option>7</option><option>14</option><option>30</option></select>
+          <div class="hint">days</div>
+        </div>
+        <div>
+          <label for="sShots">Screenshots per new advertiser</label>
+          <select id="sShots"><option>0</option><option>1</option><option>2</option><option>3</option><option>5</option></select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <label class="check"><input type="checkbox" id="sClean"> Post an all-clear on days with nothing to report</label>
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px"><button class="primary" id="saveSettings">Save settings</button></div>
+    </details>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>How it works, and one-time setup</summary>
+      <p>Every day at noon Eastern a scan checks the Google Ads Transparency Center for each client's website,
+        lists every advertiser running ads that send people there, and posts to that client's Slack channel.
+        Anyone who isn't the client's official advertiser is flagged. New ones get screenshots and their ad copy in the thread.</p>
+      <p><b>Setting up a client</b></p>
+      <ol class="steps">
+        <li>Click <b>+ Add client</b>. Enter the website, the official advertiser name as Google shows it, and the Slack channel ID.</li>
+        <li>Invite the Slack bot into that channel (<code>/invite @YourBot</code>), then press <b>Send Slack test</b>. A "connected" line should appear in the channel.</li>
+        <li>Press <b>Test scan</b>. It posts nothing. In a few minutes this page lists every advertiser found.</li>
+        <li>Find the client's own account in the list and press <b>This is the client</b>. That pins its ID, so a look-alike name can't pass as official.</li>
+        <li>Done. The daily scan picks the client up automatically. <b>Scan &amp; post now</b> sends a report immediately.</li>
+      </ol>
+      <p class="small muted">The first real report lists every non-official advertiser as new, because the tool hasn't seen any of them before.
+        After that, only genuinely new advertisers and new ads get screenshots.</p>
+    </details>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+(function () {
+  var PIN = '';
+  try { PIN = sessionStorage.getItem('atPin') || ''; } catch (e) {}
+  var S = { config: null, sha: null, results: {}, runs: [], editing: null, expanded: {} };
+  var pollTimer = null;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function ago(iso) {
+    if (!iso) return '';
+    var s = (Date.now() - Date.parse(iso)) / 1000;
+    if (s < 90) return 'just now';
+    if (s < 3600) return Math.round(s / 60) + ' min ago';
+    if (s < 86400 * 2) return Math.round(s / 3600) + ' h ago';
+    return Math.round(s / 86400) + ' days ago';
+  }
+  function toast(msg, err) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (err ? ' err' : '');
+    clearTimeout(toast.t);
+    toast.t = setTimeout(function () { t.className = 'toast hidden'; }, err ? 7000 : 3500);
+  }
+
+  function api(action, body) {
+    body = body || {};
+    body.action = action;
+    return fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-admin-pin': PIN },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().catch(function () { return { ok: false, error: 'Server returned HTTP ' + r.status }; })
+        .then(function (j) {
+          if (r.status === 401) { lock('Wrong PIN.'); throw new Error('pin'); }
+          if (!j.ok) { var e = new Error(j.errors ? j.errors.join(' ') : j.error); e.data = j; throw e; }
+          return j;
+        });
+    });
+  }
+
+  function lock(msg) {
+    PIN = '';
+    try { sessionStorage.removeItem('atPin'); } catch (e) {}
+    $('app').classList.add('hidden');
+    $('topActions').style.display = 'none';
+    $('pinView').classList.remove('hidden');
+    $('pinErr').textContent = msg || '';
+    $('pinErr').classList.toggle('hidden', !msg);
+  }
+
+  function unlock() {
+    PIN = $('pinInput').value.trim();
+    if (!PIN) return;
+    load(true);
+  }
+
+  function load(first) {
+    return api('load').then(function (j) {
+      S.config = j.config; S.sha = j.sha; S.results = j.results || {};
+      S.runs = Array.isArray(j.runs) ? j.runs : [];
+      S.runsError = j.runs && j.runs.error;
+      if (first) {
+        try { sessionStorage.setItem('atPin', PIN); } catch (e) {}
+        $('pinView').classList.add('hidden');
+        $('app').classList.remove('hidden');
+        $('topActions').style.display = '';
+        if (!S.config.targets.length) S.editing = 'new';
+      }
+      $('loadErr').classList.add('hidden');
+      render();
+      schedulePoll();
+    }).catch(function (e) {
+      if (e.message === 'pin') return;
+      if (first && $('pinView').offsetParent) { $('pinErr').textContent = e.message; $('pinErr').classList.remove('hidden'); return; }
+      $('loadErr').textContent = e.message; $('loadErr').classList.remove('hidden');
+    });
+  }
+
+  function save(config, message) {
+    return api('save', { config: config, sha: S.sha, message: message }).then(function (j) {
+      S.config = j.config; S.sha = j.sha;
+      render();
+      return j;
+    });
+  }
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---- rendering ----
+
+  function statusBlock(t) {
+    var r = S.results[t.domain];
+    if (!r) return '<div class="notice n-blue">Never scanned. Press <b>Test scan</b> to see who is advertising to ' + esc(t.domain) + '.</div>';
+    if (!r.ok) return '<div class="notice n-red"><b>Last scan failed</b> (' + esc(ago(r.scannedAt)) + '): ' + esc(r.error) + '</div>';
+    var html = '<div class="stats">' +
+      '<div class="stat"><b>' + r.totalAdvertisers + '</b><span>advertisers running ads</span></div>' +
+      '<div class="stat"><b style="color:var(--' + (r.unauthorized ? 'red' : 'green') + ')">' + r.unauthorized + '</b><span>not authorized</span></div>' +
+      '<div class="stat"><b>' + r.totalAds + '</b><span>ads in the last ' + r.activeWithinDays + ' days</span></div>' +
+      '</div><div class="small muted">Last ' + (r.dryRun ? 'test scan' : 'scan') + ' ' + esc(ago(r.scannedAt)) +
+      (r.truncated ? ' · <span class="badge b-amber">partial list</span>' : '') + '</div>';
+    return html;
+  }
+
+  function advertiserTable(t) {
+    var r = S.results[t.domain];
+    if (!r || !r.ok || !r.advertisers || !r.advertisers.length) return '';
+    var pinned = t.officialAdvertiserIds || [];
+    var rows = r.advertisers.map(function (a) {
+      var isPinned = pinned.indexOf(a.id) !== -1;
+      var badge = a.official
+        ? '<span class="badge b-green">Official</span>' + (isPinned ? '' : ' <span class="badge b-amber" title="Matched by name only">by name</span>')
+        : '<span class="badge b-red">Not authorized</span>' + (a.isNew && !r.dryRun ? ' <span class="badge b-blue">New</span>' : '');
+      var action = isPinned
+        ? '<button class="link" data-act="unpin" data-id="' + esc(a.id) + '" data-domain="' + esc(t.domain) + '">Not the client</button>'
+        : '<button class="link" data-act="pin" data-id="' + esc(a.id) + '" data-name="' + esc(a.name) + '" data-domain="' + esc(t.domain) + '">This is the client</button>';
+      return '<tr><td><a href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name) + '</a><br><code>' + esc(a.id) + '</code></td>' +
+        '<td>' + badge + '</td><td>' + a.ads + ' (' + esc(a.formats.join('/')) + ')</td>' +
+        '<td>' + esc(a.lastShown ? a.lastShown.slice(0, 10) : '—') + '</td><td>' + action + '</td></tr>';
+    }).join('');
+    var open = S.expanded[t.domain] !== false;
+    return '<details ' + (open ? 'open' : '') + ' data-exp="' + esc(t.domain) + '" style="margin-top:14px"><summary>Advertisers found (' + r.advertisers.length + ')</summary>' +
+      '<div class="tablewrap"><table><thead><tr><th>Advertiser</th><th>Status</th><th>Ads</th><th>Last shown</th><th></th></tr></thead><tbody>' +
+      rows + '</tbody></table></div></details>';
+  }
+
+  function warnings(t) {
+    var w = [];
+    if (!t.slackChannelId) w.push('No Slack channel yet. The daily scan will skip this client until one is added.');
+    var r = S.results[t.domain];
+    if (r && r.ok && !(t.officialAdvertiserIds || []).length) {
+      var byName = (r.advertisers || []).filter(function (a) { return a.official; });
+      if (!byName.length) w.push('None of the advertisers found matches the official name "' + (t.officialAdvertiserNames || []).join(', ') + '". Check the spelling, or press "This is the client" on the right one.');
+      else w.push('The official account is matched by name only. Press "This is the client" on it to pin its ID.');
+    }
+    return w.map(function (x) { return '<div class="notice n-amber">' + esc(x) + '</div>'; }).join('');
+  }
+
+  function editForm(t, isNew) {
+    t = t || { name: '', domain: '', enabled: true, officialAdvertiserNames: [], officialAdvertiserIds: [], slackChannelId: '' };
+    return '<div class="edit" data-form="' + (isNew ? 'new' : esc(t.domain)) + '"><div class="grid">' +
+      '<div><label>Client name</label><input name="name" value="' + esc(t.name) + '" placeholder="DirectMeds"></div>' +
+      '<div><label>Website</label><input name="domain" value="' + esc(t.domain) + '" placeholder="directmeds.com"><div class="hint">The site the ads send people to.</div></div>' +
+      '<div><label>Official advertiser name(s)</label><textarea name="officialAdvertiserNames" placeholder="Direct Meds LLC">' + esc((t.officialAdvertiserNames || []).join('\n')) + '</textarea>' +
+        '<div class="hint">The verified name Google shows on the client\'s ads. One per line. Everyone else is flagged.</div></div>' +
+      '<div><label>Slack channel ID</label><input name="slackChannelId" value="' + esc(t.slackChannelId) + '" placeholder="C0123ABCDEF">' +
+        '<div class="hint">In Slack, click the channel name. The ID is at the bottom of the popup. Invite the bot to the channel too.</div></div>' +
+      '<div><label>Pinned advertiser IDs</label><textarea name="officialAdvertiserIds" placeholder="Filled in by &quot;This is the client&quot;">' + esc((t.officialAdvertiserIds || []).join('\n')) + '</textarea>' +
+        '<div class="hint">Optional. Easiest to fill from the list after a test scan.</div></div>' +
+      '<div><label>&nbsp;</label><label class="check"><input type="checkbox" name="enabled" ' + (t.enabled !== false ? 'checked' : '') + '> Include in the daily scan</label></div>' +
+      '</div><div class="formErr notice n-red hidden"></div>' +
+      '<div class="row" style="margin-top:14px"><button class="primary" data-act="saveClient">' + (isNew ? 'Add client' : 'Save') + '</button>' +
+      '<button data-act="cancel">Cancel</button>' + (isNew ? '' : '<span style="flex:1"></span><button class="danger" data-act="delete" data-domain="' + esc(t.domain) + '">Remove client</button>') +
+      '</div></div>';
+  }
+
+  function clientCard(t) {
+    var r = S.results[t.domain];
+    var head = r && r.ok
+      ? (r.unauthorized ? '<span class="badge b-red">' + r.unauthorized + ' not authorized</span>' : '<span class="badge b-green">All clear</span>')
+      : (r ? '<span class="badge b-red">Scan failed</span>' : '<span class="badge b-grey">Not scanned</span>');
+    if (t.enabled === false) head += ' <span class="badge b-grey">Paused</span>';
+    var busy = runningFor(t.domain);
+    var editing = S.editing === t.domain;
+    return '<div class="card client"><div class="row between"><div class="row"><h2>' + esc(t.name) + '</h2>' + head + '</div>' +
+      '<a class="small" href="https://adstransparency.google.com/?domain=' + encodeURIComponent(t.domain) + '&region=' + esc(S.config.region === 'anywhere' ? 'anywhere' : S.config.region) + '" target="_blank" rel="noopener">' + esc(t.domain) + ' ↗</a></div>' +
+      statusBlock(t) + warnings(t) +
+      (busy ? '<div class="notice n-blue">A ' + esc(busy) + ' is running. This page updates when it finishes (usually 2–5 minutes).</div>' : '') +
+      '<div class="row" style="margin-top:14px">' +
+      '<button data-act="run" data-mode="dry-run" data-domain="' + esc(t.domain) + '" ' + (busy ? 'disabled' : '') + ' title="Scans and updates this page. Posts nothing to Slack.">Test scan</button>' +
+      '<button data-act="run" data-mode="slack-test" data-domain="' + esc(t.domain) + '" ' + (busy || !t.slackChannelId ? 'disabled' : '') + ' title="Posts a one-line &quot;connected&quot; message to the channel.">Send Slack test</button>' +
+      '<button data-act="run" data-mode="scan" data-domain="' + esc(t.domain) + '" ' + (busy || !t.slackChannelId ? 'disabled' : '') + ' title="Scans and posts the report to Slack now.">Scan &amp; post now</button>' +
+      '<span style="flex:1"></span><button class="link" data-act="edit" data-domain="' + esc(t.domain) + '">' + (editing ? 'Close' : 'Edit') + '</button></div>' +
+      (editing ? editForm(t, false) : '') +
+      advertiserTable(t) + '</div>';
+  }
+
+  function runLabel(w) {
+    if (w.status !== 'completed') return '<span class="badge b-blue">' + (w.status === 'queued' ? 'Queued' : 'Running') + '</span>';
+    if (w.conclusion === 'success') return '<span class="badge b-green">Done</span>';
+    if (w.conclusion === 'skipped' || w.conclusion === 'cancelled') return '<span class="badge b-grey">' + esc(w.conclusion) + '</span>';
+    return '<span class="badge b-red">Failed</span>';
+  }
+
+  function activeRuns() {
+    return S.runs.filter(function (w) { return w.status !== 'completed'; });
+  }
+
+  // Run titles are "dry-run · directmeds.com" (see run-name in the workflow).
+  function runningFor(domain) {
+    var names = { 'dry-run': 'test scan', 'scan': 'scan', 'slack-test': 'Slack test' };
+    var hit = null;
+    activeRuns().forEach(function (w) {
+      var m = /^(dry-run|scan|slack-test) · (.+)$/.exec(w.title || '');
+      if (m && (m[2] === domain || m[2] === 'all clients')) hit = names[m[1]];
+      if (w.title === 'Daily scan') hit = 'daily scan';
+    });
+    return hit;
+  }
+
+  function render() {
+    var c = S.config;
+    var html = '';
+    if (S.editing === 'new') html += '<div class="card"><h2>Add a client</h2>' + editForm(null, true) + '</div>';
+    if (!c.targets.length && S.editing !== 'new') html += '<div class="card muted">No clients yet. Press <b>+ Add client</b>.</div>';
+    html += c.targets.map(clientCard).join('');
+    $('clients').innerHTML = html;
+
+    $('runs').innerHTML = S.runsError
+      ? '<li class="notice n-red">' + esc(S.runsError) + '</li>'
+      : (S.runs.length ? S.runs.map(function (w) {
+          return '<li>' + runLabel(w) + '<span>' + esc(w.title) + '</span><span class="muted small">' + esc(ago(w.createdAt)) +
+            '</span><a class="small" href="' + esc(w.url) + '" target="_blank" rel="noopener">Log &amp; screenshots ↗</a></li>';
+        }).join('') : '<li class="muted">No runs yet.</li>');
+
+    $('sRegion').value = c.region;
+    $('sDays').value = String(c.activeWithinDays);
+    $('sShots').value = String(c.maxScreenshotsPerAdvertiser);
+    $('sClean').checked = !!c.postWhenClean;
+  }
+
+  // While a run is in flight, poll; when the count of active runs drops,
+  // reload everything so the new results appear without a manual refresh.
+  function schedulePoll() {
+    clearTimeout(pollTimer);
+    if (!activeRuns().length && !S.awaitingRun) return;
+    pollTimer = setTimeout(function () {
+      var before = activeRuns().length;
+      api('runs').then(function (j) {
+        S.runs = j.runs;
+        var now = activeRuns().length;
+        if (S.awaitingRun && now) S.awaitingRun = false;
+        if (S.awaitingRun && Date.now() - S.awaitingRun > 60000) S.awaitingRun = false;
+        if (now < before) return load(false);
+        render();
+        schedulePoll();
+      }).catch(function () { schedulePoll(); });
+    }, 8000);
+  }
+
+  // ---- actions ----
+
+  function readForm(box) {
+    var get = function (n) { return box.querySelector('[name="' + n + '"]'); };
+    return {
+      name: get('name').value,
+      domain: get('domain').value,
+      officialAdvertiserNames: get('officialAdvertiserNames').value,
+      officialAdvertiserIds: get('officialAdvertiserIds').value,
+      slackChannelId: get('slackChannelId').value,
+      enabled: get('enabled').checked
+    };
+  }
+
+  function act(btn) {
+    var a = btn.getAttribute('data-act');
+    var domain = btn.getAttribute('data-domain');
+    var cfg = clone(S.config);
+    var idx = cfg.targets.findIndex(function (t) { return t.domain === domain; });
+
+    if (a === 'edit') { S.editing = S.editing === domain ? null : domain; render(); return; }
+    if (a === 'cancel') { S.editing = null; render(); return; }
+
+    if (a === 'saveClient') {
+      var box = btn.closest('[data-form]');
+      var key = box.getAttribute('data-form');
+      var t = readForm(box);
+      if (key === 'new') cfg.targets.push(t);
+      else {
+        var i = cfg.targets.findIndex(function (x) { return x.domain === key; });
+        cfg.targets[i] = t;
+      }
+      btn.disabled = true;
+      save(cfg, (key === 'new' ? 'Add client ' : 'Update client ') + (t.name || t.domain)).then(function () {
+        S.editing = null; render();
+        toast(key === 'new' ? 'Client added. Next: Send Slack test, then Test scan.' : 'Saved.');
+      }).catch(function (e) {
+        btn.disabled = false;
+        var err = box.querySelector('.formErr');
+        err.textContent = e.message; err.classList.remove('hidden');
+      });
+      return;
+    }
+
+    if (a === 'delete') {
+      // Armed on the button rather than confirm(): one extra press, no dialog.
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.textContent = 'Press again to remove ' + cfg.targets[idx].name;
+        return;
+      }
+      var removed = cfg.targets.splice(idx, 1)[0];
+      save(cfg, 'Remove client ' + removed.name).then(function () { S.editing = null; render(); toast('Removed ' + removed.name + '.'); })
+        .catch(function (e) { toast(e.message, true); });
+      return;
+    }
+
+    if (a === 'pin' || a === 'unpin') {
+      var id = btn.getAttribute('data-id');
+      var tt = cfg.targets[idx];
+      var ids = tt.officialAdvertiserIds || [];
+      if (a === 'pin') {
+        if (ids.indexOf(id) === -1) ids.push(id);
+        var nm = btn.getAttribute('data-name');
+        if (nm && tt.officialAdvertiserNames.indexOf(nm) === -1) tt.officialAdvertiserNames.push(nm);
+      } else {
+        ids = ids.filter(function (x) { return x !== id; });
+      }
+      tt.officialAdvertiserIds = ids;
+      btn.disabled = true;
+      save(cfg, (a === 'pin' ? 'Pin official advertiser ' : 'Unpin advertiser ') + id + ' for ' + tt.domain).then(function () {
+        // Re-mark the row locally so the table is right before the next scan.
+        var r = S.results[tt.domain];
+        if (r && r.advertisers) r.advertisers.forEach(function (x) {
+          if (x.id === id) x.official = a === 'pin' || tt.officialAdvertiserNames.indexOf(x.name) !== -1;
+        });
+        if (r && r.advertisers) r.unauthorized = r.advertisers.filter(function (x) { return !x.official; }).length;
+        render();
+        toast(a === 'pin' ? 'Pinned as the official advertiser.' : 'Unpinned.');
+      }).catch(function (e) { btn.disabled = false; toast(e.message, true); });
+      return;
+    }
+
+    if (a === 'run') {
+      var mode = btn.getAttribute('data-mode');
+      btn.disabled = true;
+      api('run', { mode: mode, target: domain }).then(function () {
+        toast({ 'dry-run': 'Test scan started. Results appear here in a few minutes.', 'slack-test': 'Slack test sent. Check the channel in about a minute.', 'scan': 'Scan started. The report posts to Slack in a few minutes.' }[mode]);
+        S.awaitingRun = Date.now();
+        setTimeout(function () { api('runs').then(function (j) { S.runs = j.runs; render(); schedulePoll(); }); }, 3000);
+      }).catch(function (e) { btn.disabled = false; toast(e.message, true); });
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (btn) act(btn);
+  });
+  document.addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (d.getAttribute && d.getAttribute('data-exp')) S.expanded[d.getAttribute('data-exp')] = d.open;
+  }, true);
+
+  $('pinGo').onclick = unlock;
+  $('pinInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') unlock(); });
+  $('addClient').onclick = function () { S.editing = 'new'; render(); window.scrollTo(0, 0); };
+  $('refreshRuns').onclick = function () { load(false); };
+  $('saveSettings').onclick = function () {
+    var cfg = clone(S.config);
+    cfg.region = $('sRegion').value;
+    cfg.activeWithinDays = Number($('sDays').value);
+    cfg.maxScreenshotsPerAdvertiser = Number($('sShots').value);
+    cfg.postWhenClean = $('sClean').checked;
+    save(cfg, 'Update settings').then(function () { toast('Settings saved.'); }).catch(function (e) { toast(e.message, true); });
+  };
+
+  if (PIN) { $('pinInput').value = PIN; load(true); }
+})();
+</script>
+</body>
+</html>

@@ -9,9 +9,10 @@
     {
       "name": "DirectMeds",
       "domain": "directmeds.com",
+      "enabled": true,
       "officialAdvertiserNames": ["Direct Meds LLC"],
       "officialAdvertiserIds": [],
-      "slackChannelEnv": "SLACK_CHANNEL_DIRECTMEDS"
+      "slackChannelId": ""
     }
   ]
 }

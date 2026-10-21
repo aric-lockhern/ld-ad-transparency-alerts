@@ -1,0 +1,18 @@
+# The setup page. The scan itself runs in GitHub Actions; this site only
+# edits config.json and starts runs, through the GitHub API.
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+  # A build that fails the unit tests never publishes.
+  command = "npm test"
+  # The daily scan commits results/ and state/ to main every day, and the
+  # page edits config.json. None of that changes the site, so none of it
+  # should cost a deploy.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- public netlify src netlify.toml package.json package-lock.json"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+
+[functions]
+  node_bundler = "esbuild"

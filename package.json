@@ -10,7 +10,8 @@
   "scripts": {
     "scan": "node src/run.mjs",
     "scan:dry": "node src/run.mjs --dry-run",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:ui": "node scripts/ui-check.mjs"
   },
   "dependencies": {
     "playwright": "1.56.1"

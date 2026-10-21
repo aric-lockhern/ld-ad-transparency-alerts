@@ -36,30 +36,70 @@ and emails the repo owner.
 
 ## Setup
 
-1. **Slack app.** Create one at api.slack.com/apps, add the bot scopes `chat:write` and `files:write`,
-   install it to the workspace, and copy the bot token (`xoxb-…`). Invite the bot to the shared
-   client channel (`/invite @YourApp`). Inviting it is what lets it post into a Slack Connect channel.
-2. **Repo secrets** (Settings → Secrets and variables → Actions):
-   | Secret | Value |
+There are two halves:
+
+- **The setup page** (Netlify): add clients, run a test scan, see who was found, and pin the
+  client's own account. It holds no data of its own. It edits `config.json` in this repo
+  through the GitHub API and starts runs.
+- **The scan** (GitHub Actions): runs daily at noon Eastern, plus whenever the page starts a run.
+  It posts to Slack and saves each client's latest results to `results/`, which the page reads.
+
+### 1. Slack app (once)
+
+Create an app at api.slack.com/apps (*From scratch*). Under **OAuth & Permissions**, add the bot
+scopes `chat:write` and `files:write`, then install it to the workspace and copy the **Bot User
+OAuth Token** (`xoxb-…`).
+
+### 2. GitHub secrets (once)
+
+Repo → **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Value |
+|---|---|
+| `SLACK_BOT_TOKEN` | the `xoxb-…` token |
+| `SLACK_ERROR_CHANNEL` | optional. ID of an internal channel that gets "the scan broke" messages. These never go to a client channel |
+
+### 3. GitHub token for the page (once)
+
+github.com → **Settings → Developer settings → Fine-grained tokens → Generate new token**:
+- Repository access: **Only select repositories** → `ld-ad-transparency-alerts`
+- Permissions: **Contents: Read and write**, **Actions: Read and write**
+
+### 4. Netlify site (once)
+
+1. Netlify → **Add new site → Import an existing project** → GitHub → this repo. The build
+   settings come from `netlify.toml`, so leave them as they are.
+2. **Site configuration → Environment variables**:
+
+   | Variable | Value |
    |---|---|
-   | `SLACK_BOT_TOKEN` | the `xoxb-…` token |
-   | `SLACK_CHANNEL_DIRECTMEDS` | channel ID of the shared client channel (`C0…`; open the channel details, it's at the bottom) |
-   | `SLACK_ERROR_CHANNEL` | optional. Channel ID of an internal channel for scan failures |
-3. **First run.** Go to Actions → *Daily ad transparency scan* → *Run workflow*, and tick **Dry run**.
-   The log lists every advertiser it found, marked OFFICIAL or FLAGGED, along with their
-   `AR…` IDs. Screenshots go to the run's artifacts.
-4. **Pin the official advertiser ID.** Copy Direct Meds LLC's `AR…` ID from that log into
-   `officialAdvertiserIds` in `config.json`. Until you do, the official account is matched by
-   name, and the Slack message reminds you to pin it.
-5. Run it once for real (without Dry run). From then on it runs every day at noon Eastern.
+   | `ADMIN_PIN` | the PIN the page asks for |
+   | `GITHUB_TOKEN` | the fine-grained token from step 3 |
+   | `GITHUB_REPO` | optional. Defaults to `aric-lockhern/ld-ad-transparency-alerts` |
 
-## Adding another client
+3. Redeploy (**Deploys → Trigger deploy**) so the function picks up the variables.
 
-Add an entry to `targets` in `config.json`, then add a secret with the name you gave
-`slackChannelEnv`, and add that secret to the `env:` block of the *Scan and alert* step in
-`.github/workflows/daily-scan.yml`.
+### 5. Each client (on the page)
+
+1. **+ Add client**: enter the website, the official advertiser name as Google shows it, and the
+   Slack channel ID. To find the ID, click the channel name in Slack; it's at the bottom of the popup.
+2. In Slack, invite the bot to that channel (`/invite @YourBot`). It needs to be a member to post
+   in a shared Slack Connect channel.
+3. **Send Slack test**: a "connected" line should appear in the channel within a minute.
+4. **Test scan**: scans without posting anything. A few minutes later the card lists every
+   advertiser found.
+5. On the client's own account, press **This is the client**. That pins its `AR…` ID, so a
+   look-alike name can't pass as official.
+6. That's it. The daily scan picks the client up from then on. **Scan & post now** sends a report
+   immediately.
+
+The first real report lists every non-official advertiser as new, because the tool hasn't seen any
+of them before. After that, only new advertisers and new ads get screenshots.
 
 ## Config (`config.json`)
+
+The page edits this file, and you can also edit it by hand. Both go through the same validation
+(`src/config.mjs`).
 
 | Key | Meaning |
 |---|---|
@@ -68,6 +108,8 @@ Add an entry to `targets` in `config.json`, then add a secret with the name you 
 | `maxScreenshotsPerAdvertiser` / `maxScreenshotsPerRun` | caps that keep a flood of creatives from making the run slow or the thread unreadable |
 | `targets[].officialAdvertiserNames` | verified advertiser names that count as official (case and punctuation ignored) |
 | `targets[].officialAdvertiserIds` | `AR…` IDs that count as official. These are exact, so prefer them |
+| `targets[].slackChannelId` | the client's Slack channel. With none, the daily scan skips the client |
+| `targets[].enabled` | `false` pauses the client without deleting it |
 
 ## How it works, and its limits
 
@@ -96,7 +138,8 @@ Add an entry to `targets` in `config.json`, then add a secret with the name you 
 ```
 npm ci
 npx playwright install chromium
-npm test                        # offline unit tests
+npm test                        # offline unit tests (also the Netlify build gate)
+npm run test:ui                 # setup page in headless Chromium, stubbed backend, screenshots in .uicheck/
 npm run scan:dry                # real scan, prints the Slack messages, posts nothing
-SLACK_BOT_TOKEN=… SLACK_CHANNEL_DIRECTMEDS=C0… npm run scan
+node src/run.mjs --only=directmeds.com --dry-run
 ```
