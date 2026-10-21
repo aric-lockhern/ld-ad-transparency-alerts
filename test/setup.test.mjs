@@ -131,3 +131,19 @@ test('result summary is what the page needs to pin the official account', () => 
   ]);
   assert.match(s.advertisers[1].url, /\/advertiser\/AR0+2\?region=US$/);
 });
+
+test('advertisers outside the window are kept and marked, never dropped (the 1-of-4 bug)', async () => {
+  const page2 = JSON.parse(readFileSync(new URL('./fixtures/search-page2.json', import.meta.url)));
+  const page1 = JSON.parse(readFileSync(new URL('./fixtures/search-page1.json', import.meta.url)));
+  const creatives = [...parseSearchResponse(page1).creatives, ...parseSearchResponse(page2).creatives];
+  const target = { domain: 'directmeds.com', officialAdvertiserNames: ['Direct Meds LLC'], officialAdvertiserIds: [] };
+  const report = buildReport({ target, creatives, prevState: null, now: 1761000000000, activeWithinDays: 7 });
+  const s = resultSummary(report, { dryRun: true, truncated: false });
+  const old = s.advertisers.find((a) => a.name === 'Old Affiliate LLC');
+  assert.ok(old, 'the stale advertiser is still listed');
+  assert.equal(old.active, false);
+  assert.equal(old.official, false);
+  assert.equal(s.unauthorized, 2, 'but it is not counted as running now');
+  assert.equal(s.totalAllTime, 5);
+  assert.ok(s.advertisers.filter((a) => a.active).length === 3);
+});

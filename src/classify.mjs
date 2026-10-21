@@ -66,6 +66,14 @@ export function buildReport({ target, creatives, prevState, now = Date.now(), ac
     firstRun,
     activeWindow: activeWithinDays,
     totalAdvertisers: advertisers.length,
+    // Everyone Google lists but who has not run inside the window. Kept so the
+    // page can show them: the first live scan dropped three of four
+    // advertisers this way, one of them by a single day, and they simply
+    // vanished from view.
+    inactive: groupByAdvertiser(creatives.filter((c) => !isActive(c, now, activeWithinDays)))
+      .filter((a) => !advertisers.some((x) => x.advertiserId === a.advertiserId))
+      .map((a) => ({ ...a, official: isOfficial(a, target) })),
+    totalAllTime: creatives.length,
     totalCreatives: active.length,
     official,
     unofficial,

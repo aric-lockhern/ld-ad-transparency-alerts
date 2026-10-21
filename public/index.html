@@ -126,7 +126,7 @@
         </div>
         <div>
           <label for="sDays">Count an ad as running if seen in the last</label>
-          <select id="sDays"><option>3</option><option>7</option><option>14</option><option>30</option></select>
+          <select id="sDays"><option>7</option><option>14</option><option>30</option><option>60</option><option>90</option></select>
           <div class="hint">days</div>
         </div>
         <div>
@@ -265,9 +265,10 @@
     if (!r) return '<div class="notice n-blue">Never scanned. Press <b>Test scan</b> to see who is advertising to ' + esc(t.domain) + '.</div>';
     if (!r.ok) return '<div class="notice n-red"><b>Last scan failed</b> (' + esc(ago(r.scannedAt)) + '): ' + esc(r.error) + '</div>';
     var html = '<div class="stats">' +
-      '<div class="stat"><b>' + r.totalAdvertisers + '</b><span>advertisers running ads</span></div>' +
+      '<div class="stat"><b>' + r.totalAdvertisers + '</b><span>advertisers in the last ' + r.activeWithinDays + ' days</span></div>' +
       '<div class="stat"><b style="color:var(--' + (r.unauthorized ? 'red' : 'green') + ')">' + r.unauthorized + '</b><span>not authorized</span></div>' +
       '<div class="stat"><b>' + r.totalAds + '</b><span>ads in the last ' + r.activeWithinDays + ' days</span></div>' +
+      (r.totalAllTime != null ? '<div class="stat"><b>' + (r.advertisers || []).length + '</b><span>advertisers ever (' + r.totalAllTime + ' ads)</span></div>' : '') +
       '</div><div class="small muted">Last ' + (r.dryRun ? 'test scan' : 'scan') + ' ' + esc(ago(r.scannedAt)) +
       (r.truncated ? ' · <span class="badge b-amber">partial list</span>' : '') + '</div>';
     return html;
@@ -279,13 +280,15 @@
     var pinned = t.officialAdvertiserIds || [];
     var rows = r.advertisers.map(function (a) {
       var isPinned = pinned.indexOf(a.id) !== -1;
+      var active = a.active !== false;
       var badge = a.official
         ? '<span class="badge b-green">Official</span>' + (isPinned ? '' : ' <span class="badge b-amber" title="Matched by name only">by name</span>')
-        : '<span class="badge b-red">Not authorized</span>' + (a.isNew && !r.dryRun ? ' <span class="badge b-blue">New</span>' : '');
+        : '<span class="badge ' + (active ? 'b-red' : 'b-grey') + '">Not authorized</span>' + (a.isNew && !r.dryRun && active ? ' <span class="badge b-blue">New</span>' : '');
+      if (!active) badge += ' <span class="badge b-grey" title="Google lists this advertiser, but none of its ads ran in the window">Not in last ' + r.activeWithinDays + ' days</span>';
       var action = isPinned
         ? '<button class="link" data-act="unpin" data-id="' + esc(a.id) + '" data-domain="' + esc(t.domain) + '">Not the client</button>'
         : '<button class="link" data-act="pin" data-id="' + esc(a.id) + '" data-name="' + esc(a.name) + '" data-domain="' + esc(t.domain) + '">This is the client</button>';
-      return '<tr><td><a href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name) + '</a><br><code>' + esc(a.id) + '</code></td>' +
+      return '<tr' + (active ? '' : ' style="opacity:.7"') + '><td><a href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name) + '</a><br><code>' + esc(a.id) + '</code></td>' +
         '<td>' + badge + '</td><td>' + a.ads + ' (' + esc(a.formats.join('/')) + ')</td>' +
         '<td>' + esc(a.lastShown ? a.lastShown.slice(0, 10) : '—') + '</td><td>' + action + '</td></tr>';
     }).join('');
@@ -485,7 +488,7 @@
         if (r && r.advertisers) r.advertisers.forEach(function (x) {
           if (x.id === id) x.official = a === 'pin' || tt.officialAdvertiserNames.indexOf(x.name) !== -1;
         });
-        if (r && r.advertisers) r.unauthorized = r.advertisers.filter(function (x) { return !x.official; }).length;
+        if (r && r.advertisers) r.unauthorized = r.advertisers.filter(function (x) { return !x.official && x.active !== false; }).length;
         render();
         toast(a === 'pin' ? 'Pinned as the official advertiser.' : 'Unpinned.');
       }).catch(function (e) { btn.disabled = false; toast(e.message, true); });

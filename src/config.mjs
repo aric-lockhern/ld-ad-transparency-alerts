@@ -6,7 +6,7 @@ import { REGIONS } from './transparency.mjs';
 
 export const DEFAULTS = {
   region: 'US',
-  activeWithinDays: 7,
+  activeWithinDays: 30,
   maxCreativesPerTarget: 5000,
   maxScreenshotsPerAdvertiser: 3,
   maxScreenshotsPerRun: 25,
@@ -50,7 +50,7 @@ export function validateConfig(input) {
 
   const config = {
     region: region === 'anywhere' ? region : region.toUpperCase(),
-    activeWithinDays: num(src.activeWithinDays, DEFAULTS.activeWithinDays, 1, 30),
+    activeWithinDays: num(src.activeWithinDays, DEFAULTS.activeWithinDays, 1, 90),
     maxCreativesPerTarget: num(src.maxCreativesPerTarget, DEFAULTS.maxCreativesPerTarget, 50, 10000),
     maxScreenshotsPerAdvertiser: num(src.maxScreenshotsPerAdvertiser, DEFAULTS.maxScreenshotsPerAdvertiser, 0, 10),
     maxScreenshotsPerRun: num(src.maxScreenshotsPerRun, DEFAULTS.maxScreenshotsPerRun, 0, 100),

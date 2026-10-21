@@ -70,6 +70,7 @@ export function resultSummary(report, { dryRun, truncated, now = Date.now() }) {
     formats: [...new Set(a.creatives.map((c) => c.format))],
     lastShown: a.lastShown,
     url: a.creatives[0].url.replace(/\/creative\/[^?]+/, ''),
+    active: a.active !== false,
   });
   return {
     ok: true,
@@ -81,7 +82,11 @@ export function resultSummary(report, { dryRun, truncated, now = Date.now() }) {
     totalAds: report.totalCreatives,
     unauthorized: report.unofficial.length,
     newUnauthorized: report.newUnofficial.length,
-    advertisers: [...report.official, ...report.unofficial].map(row),
+    totalAllTime: report.totalAllTime,
+    advertisers: [
+      ...[...report.official, ...report.unofficial].map(row),
+      ...report.inactive.map((a) => row({ ...a, isNew: false, newCreatives: [], active: false })),
+    ],
   };
 }
 
@@ -130,6 +135,9 @@ async function scanTarget(target, config, slack, browserCtx) {
   );
   for (const a of [...report.official, ...report.unofficial]) {
     console.log(`  ${a.official ? 'OFFICIAL ' : 'FLAGGED  '} ${a.advertiserId}  ${a.advertiserName}  (${a.creatives.length} ads)`);
+  }
+  for (const a of report.inactive) {
+    console.log(`  older     ${a.advertiserId}  ${a.advertiserName}  (${a.creatives.length} ads, last shown ${String(a.lastShown).slice(0, 10)})`);
   }
 
   const outDir = path.join(ROOT, 'out', target.domain);

@@ -1,6 +1,6 @@
 {
   "region": "US",
-  "activeWithinDays": 7,
+  "activeWithinDays": 30,
   "maxCreativesPerTarget": 5000,
   "maxScreenshotsPerAdvertiser": 3,
   "maxScreenshotsPerRun": 25,

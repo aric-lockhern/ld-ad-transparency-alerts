@@ -27,6 +27,7 @@ function backend() {
         advertisers: [
           { id: 'AR11111111111111111111', name: 'Direct Meds LLC', official: true, isNew: true, ads: 9, newAds: 9, formats: ['text', 'image'], lastShown: '2026-10-21T00:00:00Z', url: 'https://adstransparency.google.com/advertiser/AR11111111111111111111?region=US' },
           { id: 'AR22222222222222222222', name: 'Rx Savings Partners Inc', official: false, isNew: true, ads: 4, newAds: 4, formats: ['text'], lastShown: '2026-10-20T00:00:00Z', url: 'https://adstransparency.google.com/advertiser/AR22222222222222222222?region=US' },
+          { id: 'AR44444444444444444444', name: 'Sapphire Media Group LLC', official: false, isNew: false, ads: 4, newAds: 0, formats: ['video'], lastShown: '2026-06-01T00:00:00Z', url: 'https://adstransparency.google.com/advertiser/AR44444444444444444444?region=US', active: false },
           { id: 'AR33333333333333333333', name: 'A Very Long Affiliate Marketing Company Name Holdings International LLC', official: false, isNew: true, ads: 1, newAds: 1, formats: ['text'], lastShown: '2026-10-19T00:00:00Z', url: 'https://adstransparency.google.com/advertiser/AR33333333333333333333?region=US' },
         ],
       },
@@ -89,6 +90,7 @@ async function run(width, height, name) {
   await page.waitForSelector('.client');
   assert.match(await page.textContent('.client'), /2 not authorized/);
   assert.match(await page.textContent('.client'), /matched by name only/);
+  assert.match(await page.textContent('.client'), /Sapphire Media Group LLC[\s\S]*Not in last 7 days/);
   await page.screenshot({ path: `${OUT}${name}-1-client.png`, fullPage: true });
 
   // Pin the official account from the table.

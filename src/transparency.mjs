@@ -190,7 +190,12 @@ export async function searchDomain({ context, domain, region, max = 5000 }) {
 
     // Let the count render, then read it the way a person would.
     await page.waitForFunction(() => /\bads\b/i.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
-    const shown = parseShownCount(await page.evaluate(() => document.body.innerText));
+    // The response carries the exact total (fields 4 and 5, e.g. "17"); the
+    // printed "~2K ads" is the fallback, read the way a person would.
+    const exact = Number(first.json && (first.json[4] ?? first.json[5]));
+    const shown = Number.isFinite(exact) && exact > 0
+      ? exact
+      : parseShownCount(await page.evaluate(() => document.body.innerText));
 
     // Scroll once so the page asks for page two itself, which shows which
     // field carries the next-page token instead of assuming one.
