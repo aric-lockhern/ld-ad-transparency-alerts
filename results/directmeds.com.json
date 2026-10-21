@@ -1,0 +1,29 @@
+{
+  "domain": "directmeds.com",
+  "name": "DirectMeds",
+  "ok": true,
+  "scannedAt": "2026-10-21T17:41:59.001Z",
+  "dryRun": true,
+  "truncated": false,
+  "activeWithinDays": 7,
+  "totalAdvertisers": 1,
+  "totalAds": 7,
+  "unauthorized": 1,
+  "newUnauthorized": 1,
+  "advertisers": [
+    {
+      "id": "AR11773855283737001985",
+      "name": "Idea Clan , Inc",
+      "official": false,
+      "isNew": true,
+      "ads": 7,
+      "newAds": 7,
+      "formats": [
+        "image",
+        "video"
+      ],
+      "lastShown": "2026-10-20T22:43:39.000Z",
+      "url": "https://adstransparency.google.com/advertiser/AR11773855283737001985?region=US"
+    }
+  ]
+}
