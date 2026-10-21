@@ -1,0 +1,17 @@
+{
+  "region": "US",
+  "activeWithinDays": 7,
+  "maxCreativesPerTarget": 2000,
+  "maxScreenshotsPerAdvertiser": 3,
+  "maxScreenshotsPerRun": 25,
+  "postWhenClean": true,
+  "targets": [
+    {
+      "name": "DirectMeds",
+      "domain": "directmeds.com",
+      "officialAdvertiserNames": ["Direct Meds LLC"],
+      "officialAdvertiserIds": [],
+      "slackChannelEnv": "SLACK_CHANNEL_DIRECTMEDS"
+    }
+  ]
+}
