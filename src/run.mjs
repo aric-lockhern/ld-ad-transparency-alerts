@@ -4,7 +4,9 @@
 //
 //   node src/run.mjs                      scan every enabled client, post, save state
 //   node src/run.mjs --dry-run            scan, print the Slack messages, post nothing
-//   node src/run.mjs --slack-test         post a "connected" line to each channel, no scan
+//   node src/run.mjs --slack-test         post a TEST report (real scan, real channel) that
+//                                         does not count: no state is saved, so tomorrow's
+//                                         real report still marks everyone as new
 //   node src/run.mjs --only=directmeds.com
 //   node src/run.mjs --no-screenshots     scan without taking screenshots
 //
@@ -25,7 +27,7 @@ const argv = process.argv.slice(2);
 const args = new Set(argv);
 const DRY = args.has('--dry-run');
 const SLACK_TEST = args.has('--slack-test');
-const SHOTS = !args.has('--no-screenshots') && !SLACK_TEST;
+const SHOTS = !args.has('--no-screenshots');
 let SIGNED_IN = false;
 const ONLY = (argv.find((a) => a.startsWith('--only=')) || '').slice(7).trim().toLowerCase();
 
@@ -96,17 +98,6 @@ async function writeResult(target, body) {
   await writeFile(resultFile(target), JSON.stringify({ domain: target.domain, name: target.name, ...body }, null, 2) + '\n');
 }
 
-async function slackTest(target, slack) {
-  const channel = channelFor(target);
-  if (!channel) throw new Error(`no Slack channel ID set for ${target.name}`);
-  await slack.post(
-    channel,
-    `:white_check_mark: Ad transparency alerts are connected for *${target.domain}*. ` +
-      `A daily report on who is advertising to this site will arrive here around noon Eastern.`,
-  );
-  console.log(`${target.domain}: Slack test posted`);
-}
-
 async function scanTarget(target, config, slack, browserCtx) {
   const region = config.region || 'US';
   const channel = channelFor(target);
@@ -146,8 +137,9 @@ async function scanTarget(target, config, slack, browserCtx) {
   await mkdir(outDir, { recursive: true });
   await writeFile(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2));
 
-  const shouldPost = report.unofficial.length || config.postWhenClean;
-  const summary = summaryMessage(report, { region, truncated });
+  const shouldPost = report.unofficial.length || config.postWhenClean || SLACK_TEST;
+  const summary = (SLACK_TEST ? ':test_tube: *Test report* (sent from the setup page; does not count as the daily report)\n\n' : '') +
+    summaryMessage(report, { region, truncated });
   const captures = SHOTS ? pickCaptures(report, config.maxScreenshotsPerAdvertiser, config.maxScreenshotsPerRun) : [];
 
   let threadTs = null;
@@ -176,11 +168,11 @@ async function scanTarget(target, config, slack, browserCtx) {
     }
   }
 
-  await writeResult(target, resultSummary(report, { dryRun: DRY, truncated }));
+  await writeResult(target, resultSummary(report, { dryRun: DRY || SLACK_TEST, truncated }));
   // State moves only after a real post, so a failed Slack call means tomorrow
   // still reports these as new rather than silently swallowing them, and a
-  // dry run never uses up the "new" that the first real report should show.
-  if (!DRY) await writeFile(stateFile(target), JSON.stringify(nextState(prevState, creatives), null, 2) + '\n');
+  // dry run or test report never uses up the "new" the first real one shows.
+  if (!DRY && !SLACK_TEST) await writeFile(stateFile(target), JSON.stringify(nextState(prevState, creatives), null, 2) + '\n');
 }
 
 async function main() {
@@ -201,32 +193,26 @@ async function main() {
   if (!DRY && !token) throw new Error('SLACK_BOT_TOKEN is not set (use --dry-run to test without Slack)');
   const slack = token ? new Slack(token) : null;
 
-  // The search itself runs in the browser now, so every scan needs one.
-  let browser = null;
-  let context = null;
-  if (!SLACK_TEST) {
-    const { openBrowser } = await import('./capture.mjs');
-    let signedIn;
-    ({ browser, context, signedIn } = await openBrowser());
-    SIGNED_IN = signedIn;
-  }
+  // The search itself runs in the browser, so every run needs one.
+  const { openBrowser } = await import('./capture.mjs');
+  const { browser, context, signedIn } = await openBrowser();
+  SIGNED_IN = signedIn;
 
   const failures = [];
   try {
     for (const target of targets) {
       try {
-        if (SLACK_TEST) await slackTest(target, slack);
-        else await scanTarget(target, config, slack, context);
+        await scanTarget(target, config, slack, context);
       } catch (err) {
         console.error(`${target.domain}: ${err.stack || err}`);
         failures.push(`${target.domain}: ${err.message}`);
         // The page shows this instead of yesterday's numbers, which would
         // otherwise read as a scan that worked.
-        if (!SLACK_TEST) await writeResult(target, { ok: false, scannedAt: new Date().toISOString(), dryRun: DRY, error: err.message });
+        await writeResult(target, { ok: false, scannedAt: new Date().toISOString(), dryRun: DRY || SLACK_TEST, error: err.message });
       }
     }
   } finally {
-    if (browser) await browser.close();
+    await browser.close();
   }
 
   if (failures.length) {

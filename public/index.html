@@ -152,7 +152,7 @@
       <ol class="steps">
         <li>Invite the Slack bot into the channel the reports should go to (<code>/invite @YourBot</code>).</li>
         <li>Click <b>+ Add client</b>. Enter the website and the official advertiser name as Google shows it, and pick that channel from the list.</li>
-        <li>Press <b>Send Slack test</b>. A "connected" line should appear in the channel.</li>
+        <li>Press <b>Send test report</b>. A report marked "Test report", with screenshots in the thread, appears in the channel a few minutes later. It does not count, so the first real report still marks everyone as new.</li>
         <li>Press <b>Test scan</b>. It posts nothing. In a few minutes this page lists every advertiser found.</li>
         <li>Find the client's own account in the list and press <b>This is the client</b>. That pins its ID, so a look-alike name can't pass as official.</li>
         <li>Done. The daily scan picks the client up automatically. <b>Scan &amp; post now</b> sends a report immediately.</li>
@@ -349,7 +349,7 @@
       (busy ? '<div class="notice n-blue">A ' + esc(busy) + ' is running. This page updates when it finishes (usually 2–5 minutes).</div>' : '') +
       '<div class="row" style="margin-top:14px">' +
       '<button data-act="run" data-mode="dry-run" data-domain="' + esc(t.domain) + '" ' + (busy ? 'disabled' : '') + ' title="Scans and updates this page. Posts nothing to Slack.">Test scan</button>' +
-      '<button data-act="run" data-mode="slack-test" data-domain="' + esc(t.domain) + '" ' + (busy || !t.slackChannelId ? 'disabled' : '') + ' title="Posts a one-line &quot;connected&quot; message to the channel.">Send Slack test</button>' +
+      '<button data-act="run" data-mode="slack-test" data-domain="' + esc(t.domain) + '" ' + (busy || !t.slackChannelId ? 'disabled' : '') + ' title="Scans now and posts a test report, with screenshots, to the channel. It does not count as the daily report.">Send test report</button>' +
       '<button data-act="run" data-mode="scan" data-domain="' + esc(t.domain) + '" ' + (busy || !t.slackChannelId ? 'disabled' : '') + ' title="Scans and posts the report to Slack now.">Scan &amp; post now</button>' +
       '<span style="flex:1"></span><button class="link" data-act="edit" data-domain="' + esc(t.domain) + '">' + (editing ? 'Close' : 'Edit') + '</button></div>' +
       (editing ? editForm(t, false) : '') +
@@ -369,7 +369,7 @@
 
   // Run titles are "dry-run · directmeds.com" (see run-name in the workflow).
   function runningFor(domain) {
-    var names = { 'dry-run': 'test scan', 'scan': 'scan', 'slack-test': 'Slack test' };
+    var names = { 'dry-run': 'test scan', 'scan': 'scan', 'slack-test': 'test report' };
     var hit = null;
     activeRuns().forEach(function (w) {
       var m = /^(dry-run|scan|slack-test) · (.+)$/.exec(w.title || '');
@@ -551,7 +551,7 @@
       btn.disabled = true;
       save(cfg, (key === 'new' ? 'Add client ' : 'Update client ') + (t.name || t.domain)).then(function () {
         S.editing = null; render();
-        toast(key === 'new' ? 'Client added. Next: Send Slack test, then Test scan.' : 'Saved.');
+        toast(key === 'new' ? 'Client added. Next: Test scan, then Send test report.' : 'Saved.');
       }).catch(function (e) {
         btn.disabled = false;
         var err = box.querySelector('.formErr');
@@ -603,7 +603,7 @@
       var mode = btn.getAttribute('data-mode');
       btn.disabled = true;
       api('run', { mode: mode, target: domain }).then(function () {
-        toast({ 'dry-run': 'Test scan started. Results appear here in a few minutes.', 'slack-test': 'Slack test sent. Check the channel in about a minute.', 'scan': 'Scan started. The report posts to Slack in a few minutes.' }[mode]);
+        toast({ 'dry-run': 'Test scan started. Results appear here in a few minutes.', 'slack-test': 'Test report started. It arrives in the channel in a few minutes.', 'scan': 'Scan started. The report posts to Slack in a few minutes.' }[mode]);
         S.awaitingRun = Date.now();
         setTimeout(function () { api('runs').then(function (j) { S.runs = j.runs; render(); schedulePoll(); }); }, 3000);
       }).catch(function (e) { btn.disabled = false; toast(e.message, true); });

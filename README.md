@@ -89,7 +89,9 @@ github.com → **Settings → Developer settings → Fine-grained tokens → Gen
 2. **+ Add client**: enter the website and the official advertiser name as Google shows it, then
    pick the channel from the list. Shared channels are marked "shared with client"; a channel the
    bot is not in yet is marked "bot not invited". Press **Refresh list** after inviting it.
-3. **Send Slack test**: a "connected" line should appear in the channel within a minute.
+3. **Send test report**: a real report marked "Test report", with screenshots in the thread, appears
+   in the channel a few minutes later. It does not count, so the first daily report still marks
+   everyone as new.
 4. **Test scan**: scans without posting anything. A few minutes later the card lists every
    advertiser found.
 5. On the client's own account, press **This is the client**. That pins its `AR…` ID, so a
