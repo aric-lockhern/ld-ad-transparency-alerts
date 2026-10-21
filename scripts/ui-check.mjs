@@ -77,6 +77,11 @@ async function run(width, height, name) {
       S.runs.unshift({ id: 2, title: `${b.mode} · ${b.target}`, status: 'queued', conclusion: null, createdAt: new Date().toISOString(), url: 'https://github.com' });
       out = { ok: true, started: true };
     } else if (b.action === 'runs') out = { ok: true, runs: S.runs };
+    else if (b.action === 'channels') out = { ok: true, channels: [
+      { id: 'C0SHARED001', name: 'directmeds-lockhern', private: false, shared: true, member: true },
+      { id: 'C0INTERN01', name: 'paid-search', private: false, shared: false, member: true },
+      { id: 'C0NOTIN001', name: 'random', private: false, shared: false, member: false },
+    ] };
     return r.fulfill({ status: out.ok === false ? 400 : 200, contentType: 'application/json', body: JSON.stringify(out) });
   });
 
@@ -105,6 +110,19 @@ async function run(width, height, name) {
   assert.equal(S.dispatched[0].mode, 'dry-run');
   assert.equal(S.dispatched[0].target, 'directmeds.com');
   await page.waitForFunction(() => /test scan is running/.test(document.querySelector('.client').textContent), null, { timeout: 8000 });
+
+  // Pick the Slack channel from the list rather than typing an ID.
+  await page.click('.client button[data-act="edit"]');
+  await page.waitForSelector('.chanPick select option[value="C0SHARED001"]', { state: 'attached' });
+  await page.selectOption('.chanPick select', 'C0NOTIN001');
+  assert.match(await page.textContent('.chanHint'), /not in #random yet/);
+  await page.selectOption('.chanPick select', 'C0SHARED001');
+  assert.match(await page.textContent('.chanHint'), /Shared with the client/);
+  await page.screenshot({ path: `${OUT}${name}-1b-channel.png`, fullPage: true });
+  await page.click('.client [data-form] button[data-act="saveClient"]');
+  await page.waitForFunction(() => /Reports go to #directmeds-lockhern/.test(document.querySelector('.client').textContent));
+  assert.equal(S.config.targets[0].slackChannelId, 'C0SHARED001');
+  assert.equal(S.config.targets[0].slackChannelName, 'directmeds-lockhern');
 
   // Add a second client: blank domain is refused with the server's reason.
   await page.click('#addClient');

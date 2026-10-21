@@ -47,7 +47,8 @@ There are two halves:
 ### 1. Slack app (once)
 
 Create an app at api.slack.com/apps (*From scratch*). Under **OAuth & Permissions**, add the bot
-scopes `chat:write` and `files:write`, then install it to the workspace and copy the **Bot User
+scopes `chat:write`, `files:write`, `channels:read` and `groups:read` (the last two let the setup page
+list channels to pick from), then install it to the workspace and copy the **Bot User
 OAuth Token** (`xoxb-…`).
 
 ### 2. GitHub secrets (once)
@@ -76,15 +77,17 @@ github.com → **Settings → Developer settings → Fine-grained tokens → Gen
    | `ADMIN_PIN` | the PIN the page asks for |
    | `GITHUB_TOKEN` | the fine-grained token from step 3 |
    | `GITHUB_REPO` | optional. Defaults to `aric-lockhern/ld-ad-transparency-alerts` |
+   | `SLACK_BOT_TOKEN` | the same `xoxb-…` token. Lets the page list Slack channels to pick from; without it you type the channel ID |
 
 3. Redeploy (**Deploys → Trigger deploy**) so the function picks up the variables.
 
 ### 5. Each client (on the page)
 
-1. **+ Add client**: enter the website, the official advertiser name as Google shows it, and the
-   Slack channel ID. To find the ID, click the channel name in Slack; it's at the bottom of the popup.
-2. In Slack, invite the bot to that channel (`/invite @YourBot`). It needs to be a member to post
-   in a shared Slack Connect channel.
+1. In Slack, invite the bot to the channel the reports should go to (`/invite @YourBot`). It needs
+   to be a member to post, including in a shared Slack Connect channel.
+2. **+ Add client**: enter the website and the official advertiser name as Google shows it, then
+   pick the channel from the list. Shared channels are marked "shared with client"; a channel the
+   bot is not in yet is marked "bot not invited". Press **Refresh list** after inviting it.
 3. **Send Slack test**: a "connected" line should appear in the channel within a minute.
 4. **Test scan**: scans without posting anything. A few minutes later the card lists every
    advertiser found.

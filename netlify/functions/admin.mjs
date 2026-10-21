@@ -27,7 +27,7 @@ export default async (req) => {
   });
 
   try {
-    const out = await handle(String(body.action || ''), body, gh);
+    const out = await handle(String(body.action || ''), body, gh, { slackToken: process.env.SLACK_BOT_TOKEN });
     if (out && out.status) return json(out.body, out.status);
     return json({ ok: true, ...out });
   } catch (err) {

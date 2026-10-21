@@ -147,3 +147,26 @@ test('advertisers outside the window are kept and marked, never dropped (the 1-o
   assert.equal(s.totalAllTime, 5);
   assert.ok(s.advertisers.filter((a) => a.active).length === 3);
 });
+
+test('channel list: paged, members and shared channels first, scope errors are readable', async () => {
+  const { listSlackChannels } = await import('../netlify/lib/admin.mjs');
+  const pages = [
+    { ok: true, channels: [{ id: 'C1', name: 'zeta', is_member: false }, { id: 'C2', name: 'client-shared', is_member: true, is_ext_shared: true }], response_metadata: { next_cursor: 'n' } },
+    { ok: true, channels: [{ id: 'C3', name: 'alpha', is_member: true, is_private: true }], response_metadata: { next_cursor: '' } },
+  ];
+  let i = 0;
+  const fetchImpl = async () => ({ json: async () => pages[i++] });
+  const list = await listSlackChannels('xoxb-t', fetchImpl);
+  assert.deepEqual(list.map((c) => c.id), ['C2', 'C3', 'C1']);
+  assert.equal(list[0].shared, true);
+  assert.equal(list[1].private, true);
+
+  await assert.rejects(listSlackChannels('', fetchImpl), /SLACK_BOT_TOKEN is not set/);
+  const scopeErr = async () => ({ json: async () => ({ ok: false, error: 'missing_scope', needed: 'channels:read' }) });
+  await assert.rejects(listSlackChannels('xoxb-t', scopeErr), /needs the channels:read scope/);
+});
+
+test('channel name is kept for display, without the #', () => {
+  const { config } = validateConfig({ targets: [{ domain: 'a.com', officialAdvertiserNames: ['A'], slackChannelId: 'C0123ABCDEF', slackChannelName: '#client-a' }] });
+  assert.equal(config.targets[0].slackChannelName, 'client-a');
+});

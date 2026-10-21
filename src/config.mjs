@@ -69,6 +69,9 @@ export function validateConfig(input) {
       officialAdvertiserNames: list(t.officialAdvertiserNames),
       officialAdvertiserIds: list(t.officialAdvertiserIds),
       slackChannelId: String(t.slackChannelId || '').trim().toUpperCase(),
+      // Display only: the picker stores the name it showed, so the card can
+      // say where reports go without a Slack call. The ID is what posts.
+      slackChannelName: String(t.slackChannelName || '').trim().replace(/^#/, '').slice(0, 80),
     };
     if (t.slackChannelEnv) target.slackChannelEnv = String(t.slackChannelEnv);
 

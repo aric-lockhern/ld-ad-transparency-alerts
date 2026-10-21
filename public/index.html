@@ -150,8 +150,9 @@
         Anyone who isn't the client's official advertiser is flagged. New ones get screenshots and their ad copy in the thread.</p>
       <p><b>Setting up a client</b></p>
       <ol class="steps">
-        <li>Click <b>+ Add client</b>. Enter the website, the official advertiser name as Google shows it, and the Slack channel ID.</li>
-        <li>Invite the Slack bot into that channel (<code>/invite @YourBot</code>), then press <b>Send Slack test</b>. A "connected" line should appear in the channel.</li>
+        <li>Invite the Slack bot into the channel the reports should go to (<code>/invite @YourBot</code>).</li>
+        <li>Click <b>+ Add client</b>. Enter the website and the official advertiser name as Google shows it, and pick that channel from the list.</li>
+        <li>Press <b>Send Slack test</b>. A "connected" line should appear in the channel.</li>
         <li>Press <b>Test scan</b>. It posts nothing. In a few minutes this page lists every advertiser found.</li>
         <li>Find the client's own account in the list and press <b>This is the client</b>. That pins its ID, so a look-alike name can't pass as official.</li>
         <li>Done. The daily scan picks the client up automatically. <b>Scan &amp; post now</b> sends a report immediately.</li>
@@ -317,8 +318,13 @@
       '<div><label>Website</label><input name="domain" value="' + esc(t.domain) + '" placeholder="directmeds.com"><div class="hint">The site the ads send people to.</div></div>' +
       '<div><label>Official advertiser name(s)</label><textarea name="officialAdvertiserNames" placeholder="Direct Meds LLC">' + esc((t.officialAdvertiserNames || []).join('\n')) + '</textarea>' +
         '<div class="hint">The verified name Google shows on the client\'s ads. One per line. Everyone else is flagged.</div></div>' +
-      '<div><label>Slack channel ID</label><input name="slackChannelId" value="' + esc(t.slackChannelId) + '" placeholder="C0123ABCDEF">' +
-        '<div class="hint">In Slack, click the channel name. The ID is at the bottom of the popup. Invite the bot to the channel too.</div></div>' +
+      '<div><label>Slack channel</label><div class="chanPick" data-current="' + esc(t.slackChannelId) + '" data-current-name="' + esc(t.slackChannelName || '') + '">' +
+        '<select name="slackChannelPick" aria-label="Slack channel"><option value="">Loading channels…</option></select>' +
+        '<input type="hidden" name="slackChannelName" value="' + esc(t.slackChannelName || '') + '">' +
+        '<input name="slackChannelId" class="hidden" value="' + esc(t.slackChannelId) + '" placeholder="C0123ABCDEF" aria-label="Slack channel ID">' +
+        '<div class="hint chanHint"></div>' +
+        '<div class="row"><button class="link" data-act="reloadChannels" type="button">Refresh list</button>' +
+        '<button class="link" data-act="manualChannel" type="button">Type an ID instead</button></div></div></div>' +
       '<div><label>Pinned advertiser IDs</label><textarea name="officialAdvertiserIds" placeholder="Filled in by &quot;This is the client&quot;">' + esc((t.officialAdvertiserIds || []).join('\n')) + '</textarea>' +
         '<div class="hint">Optional. Easiest to fill from the list after a test scan.</div></div>' +
       '<div><label>&nbsp;</label><label class="check"><input type="checkbox" name="enabled" ' + (t.enabled !== false ? 'checked' : '') + '> Include in the daily scan</label></div>' +
@@ -339,6 +345,7 @@
     return '<div class="card client"><div class="row between"><div class="row"><h2>' + esc(t.name) + '</h2>' + head + '</div>' +
       '<a class="small" href="https://adstransparency.google.com/?domain=' + encodeURIComponent(t.domain) + '&region=' + esc(S.config.region === 'anywhere' ? 'anywhere' : S.config.region) + '" target="_blank" rel="noopener">' + esc(t.domain) + ' ↗</a></div>' +
       statusBlock(t) + warnings(t) +
+      (t.slackChannelId ? '<div class="small muted" style="margin-top:8px">Reports go to <b>' + esc(t.slackChannelName ? '#' + t.slackChannelName : t.slackChannelId) + '</b> in Slack</div>' : '') +
       (busy ? '<div class="notice n-blue">A ' + esc(busy) + ' is running. This page updates when it finishes (usually 2–5 minutes).</div>' : '') +
       '<div class="row" style="margin-top:14px">' +
       '<button data-act="run" data-mode="dry-run" data-domain="' + esc(t.domain) + '" ' + (busy ? 'disabled' : '') + ' title="Scans and updates this page. Posts nothing to Slack.">Test scan</button>' +
@@ -387,6 +394,7 @@
             '</span><a class="small" href="' + esc(w.url) + '" target="_blank" rel="noopener">Log &amp; screenshots ↗</a></li>';
         }).join('') : '<li class="muted">No runs yet.</li>');
 
+    fillChannelPickers();
     $('sRegion').value = c.region;
     $('sDays').value = String(c.activeWithinDays);
     $('sShots').value = String(c.maxScreenshotsPerAdvertiser);
@@ -414,6 +422,71 @@
 
   // ---- actions ----
 
+  // ---- Slack channel picker ----
+
+  function channelLabel(c) {
+    return '#' + c.name + (c.shared ? '  · shared with client' : '') + (c.private ? '  · private' : '') + (c.member ? '' : '  · bot not invited');
+  }
+
+  function channelHint(c) {
+    if (!c) return '';
+    if (!c.member) return 'The bot is not in #' + esc(c.name) + ' yet. In Slack, type <code>/invite @your-bot</code> in that channel, then press Refresh list.';
+    if (c.shared) return 'Shared with the client: they will see the daily report here.';
+    return 'Internal channel: only your team will see the report.';
+  }
+
+  function loadChannels() {
+    if (S.channelsLoading) return;
+    S.channelsLoading = true;
+    S.channelsErr = null;
+    api('channels').then(function (j) { S.channels = j.channels; })
+      .catch(function (e) { if (e.message !== 'pin') { S.channels = null; S.channelsErr = e.message; } })
+      .then(function () { S.channelsLoading = false; fillChannelPickers(); });
+  }
+
+  function fillChannelPickers() {
+    var boxes = document.querySelectorAll('.chanPick');
+    if (!boxes.length) return;
+    if (!S.channels && !S.channelsErr) { loadChannels(); return; }
+    Array.prototype.forEach.call(boxes, function (box) {
+      var sel = box.querySelector('select');
+      var idIn = box.querySelector('[name="slackChannelId"]');
+      var nameIn = box.querySelector('[name="slackChannelName"]');
+      var hint = box.querySelector('.chanHint');
+      var current = idIn.value;
+      if (S.channelsErr) {
+        sel.classList.add('hidden');
+        idIn.classList.remove('hidden');
+        hint.innerHTML = '<span style="color:var(--red)">' + esc(S.channelsErr) + '</span>';
+        return;
+      }
+      var list = S.channels || [];
+      var html = '<option value="">Choose a channel…</option>';
+      var found = false;
+      list.forEach(function (c) {
+        if (c.id === current) found = true;
+        html += '<option value="' + esc(c.id) + '"' + (c.id === current ? ' selected' : '') + '>' + esc(channelLabel(c)) + '</option>';
+      });
+      if (current && !found) {
+        html += '<option value="' + esc(current) + '" selected>' + esc((nameIn.value ? '#' + nameIn.value : current) + '  · not visible to the bot') + '</option>';
+      }
+      sel.innerHTML = html;
+      var picked = list.filter(function (c) { return c.id === current; })[0];
+      hint.innerHTML = picked ? channelHint(picked) : (current && !found
+        ? 'The bot cannot see this channel. Invite it there, then press Refresh list.'
+        : (list.length ? '' : 'The bot cannot see any channels yet. Invite it to one, then press Refresh list.'));
+    });
+  }
+
+  document.addEventListener('change', function (e) {
+    if (e.target.name !== 'slackChannelPick') return;
+    var box = e.target.closest('.chanPick');
+    var c = (S.channels || []).filter(function (x) { return x.id === e.target.value; })[0];
+    box.querySelector('[name="slackChannelId"]').value = e.target.value;
+    box.querySelector('[name="slackChannelName"]').value = c ? c.name : '';
+    box.querySelector('.chanHint').innerHTML = channelHint(c);
+  });
+
   function readForm(box) {
     var get = function (n) { return box.querySelector('[name="' + n + '"]'); };
     return {
@@ -422,6 +495,7 @@
       officialAdvertiserNames: get('officialAdvertiserNames').value,
       officialAdvertiserIds: get('officialAdvertiserIds').value,
       slackChannelId: get('slackChannelId').value,
+      slackChannelName: get('slackChannelName').value,
       enabled: get('enabled').checked
     };
   }
@@ -433,6 +507,17 @@
     var idx = cfg.targets.findIndex(function (t) { return t.domain === domain; });
 
     if (a === 'edit') { S.editing = S.editing === domain ? null : domain; render(); return; }
+    if (a === 'reloadChannels') { S.channels = null; S.channelsErr = null; loadChannels(); return; }
+    if (a === 'manualChannel') {
+      var pick = btn.closest('.chanPick');
+      pick.querySelector('select').classList.add('hidden');
+      var input = pick.querySelector('[name="slackChannelId"]');
+      input.classList.remove('hidden');
+      input.focus();
+      pick.querySelector('[name="slackChannelName"]').value = '';
+      pick.querySelector('.chanHint').textContent = 'In Slack, click the channel name; the ID (starting with C) is at the bottom of the popup.';
+      return;
+    }
     if (a === 'cancel') { S.editing = null; render(); return; }
 
     if (a === 'saveClient') {

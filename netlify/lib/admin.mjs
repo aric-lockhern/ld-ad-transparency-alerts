@@ -9,6 +9,8 @@
 //                 Actions read/write.
 //   GITHUB_REPO   owner/name, default aric-lockhern/ld-ad-transparency-alerts
 //   GITHUB_BRANCH default main
+//   SLACK_BOT_TOKEN optional; the same xoxb- token the scan uses. Lets the page
+//                 list channels to pick from (scopes channels:read, groups:read).
 
 import { validateConfig, resultFileName } from '../../src/config.mjs';
 
@@ -98,7 +100,49 @@ function ghError(r, what) {
   return e;
 }
 
-export async function handle(action, body, gh) {
+// Channels the bot can see, for the picker. Shared (Slack Connect) channels
+// are marked because that is where the client reads, and channels the bot is
+// not in are marked because a post there fails until someone invites it.
+export async function listSlackChannels(token, fetchImpl = fetch) {
+  if (!token) {
+    const e = new Error('SLACK_BOT_TOKEN is not set on this Netlify site, so channels cannot be listed. Add it, or type the channel ID instead.');
+    e.status = 400;
+    throw e;
+  }
+  const out = [];
+  let cursor = '';
+  for (let page = 0; page < 20; page++) {
+    const qs = new URLSearchParams({ types: 'public_channel,private_channel', exclude_archived: 'true', limit: '1000' });
+    if (cursor) qs.set('cursor', cursor);
+    const res = await fetchImpl(`https://slack.com/api/conversations.list?${qs}`, { headers: { authorization: `Bearer ${token}` } });
+    const json = await res.json();
+    if (!json.ok) {
+      const e = new Error(
+        json.error === 'missing_scope'
+          ? `The Slack app needs the ${json.needed || 'channels:read and groups:read'} scope to list channels. Add it under OAuth & Permissions, then reinstall the app.`
+          : json.error === 'invalid_auth' || json.error === 'not_authed'
+            ? 'SLACK_BOT_TOKEN on Netlify is not a valid bot token.'
+            : `Slack refused to list channels: ${json.error}`,
+      );
+      e.status = 502;
+      throw e;
+    }
+    for (const c of json.channels || []) {
+      out.push({
+        id: c.id,
+        name: c.name,
+        private: Boolean(c.is_private),
+        shared: Boolean(c.is_ext_shared || c.is_shared),
+        member: Boolean(c.is_member),
+      });
+    }
+    cursor = json.response_metadata && json.response_metadata.next_cursor;
+    if (!cursor) break;
+  }
+  return out.sort((a, b) => Number(b.member) - Number(a.member) || Number(b.shared) - Number(a.shared) || a.name.localeCompare(b.name));
+}
+
+export async function handle(action, body, gh, { slackToken, fetchImpl } = {}) {
   if (action === 'load') {
     const { data, sha } = await gh.readJson('config.json');
     const config = validateConfig(data || {}).config;
@@ -127,6 +171,8 @@ export async function handle(action, body, gh) {
   }
 
   if (action === 'runs') return { runs: await gh.runs() };
+
+  if (action === 'channels') return { channels: await listSlackChannels(slackToken, fetchImpl) };
 
   return { status: 400, body: { ok: false, error: `Unknown action ${action}` } };
 }
