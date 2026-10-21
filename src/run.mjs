@@ -26,6 +26,7 @@ const args = new Set(argv);
 const DRY = args.has('--dry-run');
 const SLACK_TEST = args.has('--slack-test');
 const SHOTS = !args.has('--no-screenshots') && !SLACK_TEST;
+let SIGNED_IN = false;
 const ONLY = (argv.find((a) => a.startsWith('--only=')) || '').slice(7).trim().toLowerCase();
 
 async function readJson(file, fallback) {
@@ -120,6 +121,7 @@ async function scanTarget(target, config, slack, browserCtx) {
   const prevState = await readJson(stateFile(target), null);
   const { creatives, truncated, shown, tokenKey, requestBody } = await searchDomain({
     context: browserCtx,
+    signedIn: SIGNED_IN,
     domain: target.domain,
     region,
     max: config.maxCreativesPerTarget,
@@ -204,7 +206,9 @@ async function main() {
   let context = null;
   if (!SLACK_TEST) {
     const { openBrowser } = await import('./capture.mjs');
-    ({ browser, context } = await openBrowser());
+    let signedIn;
+    ({ browser, context, signedIn } = await openBrowser());
+    SIGNED_IN = signedIn;
   }
 
   const failures = [];

@@ -78,6 +78,7 @@ jobs:
           MODE: ${{ inputs.mode || 'scan' }}
           TARGET: ${{ inputs.target }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          GOOGLE_COOKIES: ${{ secrets.GOOGLE_COOKIES }}
           SLACK_ERROR_CHANNEL: ${{ secrets.SLACK_ERROR_CHANNEL }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |

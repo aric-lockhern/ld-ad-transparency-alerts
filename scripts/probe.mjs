@@ -27,7 +27,8 @@ function summarise(json) {
   }
 }
 
-const { browser, context } = await openBrowser();
+const { browser, context, signedIn } = await openBrowser();
+console.log(`Session: ${signedIn ? 'signed in (GOOGLE_COOKIES)' : 'anonymous'}`);
 try {
   const page = await context.newPage();
   const captured = [];

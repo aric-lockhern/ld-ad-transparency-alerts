@@ -111,6 +111,33 @@ The page edits this file, and you can also edit it by hand. Both go through the 
 | `targets[].slackChannelId` | the client's Slack channel. With none, the daily scan skips the client |
 | `targets[].enabled` | `false` pauses the client without deleting it |
 
+## Signed-in scanning (needed for the full data set)
+
+Google shows an anonymous visitor a fraction of what it shows a signed-in one. For directmeds.com,
+anonymous visits get 17 ads from 4 advertisers, while a signed-in account sees ~2K, including
+advertisers such as Leadcap Digital AB. Identical requests get both answers, and DataForSEO's paid
+API returns the same 17. So the scan has to run signed in.
+
+It does that with a cookie export of a signed-in Google session, stored as the GitHub secret
+`GOOGLE_COOKIES`. **Those cookies are that whole Google account** (Gmail, Drive, Ads), and anyone
+who can push to this repo could use them. Prefer a dedicated Google account if a fresh one shows the
+full count. The scan loads only google.com cookies, never logs their values, and **fails loudly if
+the session is signed out**. It never falls back to the anonymous 17.
+
+1. In Chrome, use a profile signed in to the account the scanner should use. A separate Chrome
+   profile is best, because signing out of that profile ends the saved session.
+2. Install the **Cookie-Editor** extension.
+3. Open `https://adstransparency.google.com/?region=US&domain=directmeds.com` and check that it
+   shows the full count (e.g. "~2K ads").
+4. Click Cookie-Editor → **Export** → **JSON**. This copies the cookies to your clipboard.
+5. Repo → Settings → Secrets and variables → Actions → New repository secret: name `GOOGLE_COOKIES`,
+   then paste the export.
+6. Actions → **Probe Transparency Center (diagnostic)** → Run workflow. The log should say
+   `Session: signed in` and print a count far above 17.
+
+When Google ends the session (sign-out, password change, or a security check), the daily scan fails
+with "The saved Google session is signed out". Repeat steps 3–5.
+
 ## How it works, and its limits
 
 - **No official API exists.** The scan opens the real Transparency Center page for the site in

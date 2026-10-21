@@ -25,8 +25,14 @@ screenshots. Read `README.md` for setup.
    Slack Connect.
 3. **Dry runs never touch `state/`**, or the first real report loses its "NEW" markers.
 4. **Official is by pinned `AR…` ID first, name second.** The name match is the bootstrap only.
-5. **Secrets stay out of the repo**: `SLACK_BOT_TOKEN`, `SLACK_ERROR_CHANNEL` (GitHub secrets),
+5. **Secrets stay out of the repo**: `SLACK_BOT_TOKEN`, `SLACK_ERROR_CHANNEL`, `GOOGLE_COOKIES`,
+   `DATAFORSEO_LOGIN`/`_PASSWORD` (GitHub secrets),
    `ADMIN_PIN`, `GITHUB_TOKEN` (Netlify env). Slack channel IDs are not secrets and live in config.
+
+6. **`GOOGLE_COOKIES` is a whole Google account.** Anonymous Transparency Center visits see a
+   fraction of the ads (17 vs ~2K for directmeds.com; DataForSEO sees the same 17), so the scan
+   runs signed in. `src/session.mjs` loads only google.com cookies, never logs a value, and a
+   signed-out session throws. Never fall back to anonymous: that is a silent under-count.
 
 ## Tests
 `npm test` (node, offline — also the Netlify build gate) and `npm run test:ui` (setup page in

@@ -4,6 +4,7 @@
 // preview — so rendering it is the one way to get both the picture and the copy.
 
 import { chromium } from 'playwright';
+import { parseGoogleCookies } from './session.mjs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -54,7 +55,19 @@ export async function openBrowser() {
     deviceScaleFactor: 2,
     locale: 'en-US',
   });
-  return { browser, context };
+  // Signed in when GOOGLE_COOKIES is set (see session.mjs for why).
+  const cookies = parseGoogleCookies(process.env.GOOGLE_COOKIES);
+  if (cookies.length) {
+    try {
+      await context.addCookies(cookies);
+    } catch {
+      // Playwright's message can echo a cookie; this one cannot.
+      await browser.close();
+      throw new Error('GOOGLE_COOKIES could not be loaded into the browser (a cookie in it is malformed).');
+    }
+    console.log(`Signed-in session: loaded ${cookies.length} google.com cookies.`);
+  }
+  return { browser, context, signedIn: cookies.length > 0 };
 }
 
 // Text from the frames inside the ad's own box only. The creative page can

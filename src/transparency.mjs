@@ -13,6 +13,8 @@
 // unexpected shape throws, and so does a scan that collected far fewer ads than
 // the count Google prints on its own page.
 
+import { assertSignedIn } from './session.mjs';
+
 const SITE = 'https://adstransparency.google.com';
 
 // Geo criterion IDs used by the Transparency Center's region filter.
@@ -160,7 +162,7 @@ export function searchPageUrl(domain, region) {
 // Transparency Center page itself reads them. `context` is a Playwright
 // browser context. `requestBody` is returned so the log shows exactly what was
 // asked, for the day Google changes something.
-export async function searchDomain({ context, domain, region, max = 5000 }) {
+export async function searchDomain({ context, domain, region, max = 5000, signedIn = false }) {
   const page = await context.newPage();
   try {
     const captured = [];
@@ -177,6 +179,10 @@ export async function searchDomain({ context, domain, region, max = 5000 }) {
     });
 
     await page.goto(searchPageUrl(domain, region), { waitUntil: 'domcontentloaded', timeout: 60000 });
+    if (signedIn) {
+      await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+      await assertSignedIn(page);
+    }
     const forDomain = () => captured.filter((c) => JSON.stringify(c.body).includes(domain));
     const deadline = Date.now() + 45000;
     while (!forDomain().length && Date.now() < deadline) await page.waitForTimeout(500);
