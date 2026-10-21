@@ -74,6 +74,23 @@ export function creativeReply(advertiser, creative, capture) {
   return lines.join('\n');
 }
 
+// What to tell a person when the bot cannot put itself in a channel. Slack lets
+// a bot join a public channel on its own (scope channels:join); a private
+// channel only by invitation, and no scope changes that.
+export function explainJoinError(code, needed) {
+  if (code === 'missing_scope') {
+    return `The bot is not in this channel and cannot join it by itself: add the ${needed || 'channels:join'} scope to the Slack app and reinstall it, or type /invite @your-bot in the channel.`;
+  }
+  if (code === 'method_not_supported_for_channel_type' || code === 'channel_not_found') {
+    return 'This channel is private, and Slack only lets a bot into a private channel by invitation. Type /invite @your-bot in the channel.';
+  }
+  if (code === 'is_archived') return 'This channel is archived. Pick another one.';
+  if (code === 'restricted_action' || code === 'not_allowed_token_type') {
+    return 'Your Slack workspace does not allow apps to join this channel by themselves (common for channels shared with another company). Type /invite @your-bot in the channel.';
+  }
+  return `The bot could not join this channel (${code}). Type /invite @your-bot in the channel.`;
+}
+
 export class Slack {
   constructor(token, { fetchImpl = fetch } = {}) {
     this.token = token;
@@ -90,12 +107,40 @@ export class Slack {
       body: form ? new URLSearchParams(body).toString() : JSON.stringify(body),
     });
     const json = await res.json();
-    if (!json.ok) throw new Error(`Slack ${method}: ${json.error}${json.needed ? ` (needs ${json.needed})` : ''}`);
+    if (!json.ok) {
+      const e = new Error(`Slack ${method}: ${json.error}${json.needed ? ` (needs ${json.needed})` : ''}`);
+      e.code = json.error;
+      e.needed = json.needed;
+      throw e;
+    }
     return json;
   }
 
+  // Puts the bot in a public channel. Throws a sentence a person can act on.
+  async join(channel) {
+    try {
+      await this.call('conversations.join', { channel });
+    } catch (err) {
+      throw new Error(explainJoinError(err.code, err.needed));
+    }
+  }
+
+  // A send that fails because the bot is not in the channel joins it and tries
+  // once more, so a channel picked before the bot was invited still works.
+  async withJoin(channel, send) {
+    try {
+      return await send();
+    } catch (err) {
+      if (err.code !== 'not_in_channel') throw err;
+      await this.join(channel);
+      return send();
+    }
+  }
+
   post(channel, text, threadTs) {
-    return this.call('chat.postMessage', { channel, text, thread_ts: threadTs, unfurl_links: false, unfurl_media: false });
+    return this.withJoin(channel, () =>
+      this.call('chat.postMessage', { channel, text, thread_ts: threadTs, unfurl_links: false, unfurl_media: false }),
+    );
   }
 
   // files.upload is retired; this is the two-step external upload flow.
@@ -109,11 +154,13 @@ export class Slack {
     );
     const up = await this.fetch(upload_url, { method: 'POST', body: bytes });
     if (!up.ok) throw new Error(`Slack upload HTTP ${up.status}`);
-    return this.call('files.completeUploadExternal', {
-      files: [{ id: file_id, title: filename }],
-      channel_id: channel,
-      thread_ts: threadTs,
-      initial_comment: comment,
-    });
+    return this.withJoin(channel, () =>
+      this.call('files.completeUploadExternal', {
+        files: [{ id: file_id, title: filename }],
+        channel_id: channel,
+        thread_ts: threadTs,
+        initial_comment: comment,
+      }),
+    );
   }
 }

@@ -47,8 +47,9 @@ There are two halves:
 ### 1. Slack app (once)
 
 Create an app at api.slack.com/apps (*From scratch*). Under **OAuth & Permissions**, add the bot
-scopes `chat:write`, `files:write`, `channels:read` and `groups:read` (the last two let the setup page
-list channels to pick from), then install it to the workspace and copy the **Bot User
+scopes `chat:write`, `files:write`, `channels:read`, `groups:read` and `channels:join`. The read scopes let
+the setup page list channels to pick from; `channels:join` lets the bot add itself to a public
+channel. Slack only lets a bot into a private channel by invitation (`/invite @your-bot`), then install it to the workspace and copy the **Bot User
 OAuth Token** (`xoxb-…`).
 
 ### 2. GitHub secrets (once)

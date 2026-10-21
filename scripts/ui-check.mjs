@@ -77,6 +77,7 @@ async function run(width, height, name) {
       S.runs.unshift({ id: 2, title: `${b.mode} · ${b.target}`, status: 'queued', conclusion: null, createdAt: new Date().toISOString(), url: 'https://github.com' });
       out = { ok: true, started: true };
     } else if (b.action === 'runs') out = { ok: true, runs: S.runs };
+    else if (b.action === 'joinChannel') { S.joined = (S.joined || []).concat(b.channel); out = { ok: true, joined: true }; }
     else if (b.action === 'channels') out = { ok: true, channels: [
       { id: 'C0SHARED001', name: 'directmeds-lockhern', private: false, shared: true, member: true },
       { id: 'C0INTERN01', name: 'paid-search', private: false, shared: false, member: true },
@@ -114,8 +115,10 @@ async function run(width, height, name) {
   // Pick the Slack channel from the list rather than typing an ID.
   await page.click('.client button[data-act="edit"]');
   await page.waitForSelector('.chanPick select option[value="C0SHARED001"]', { state: 'attached' });
+  // A channel the bot is not in is joined as soon as it is picked.
   await page.selectOption('.chanPick select', 'C0NOTIN001');
-  assert.match(await page.textContent('.chanHint'), /not in #random yet/);
+  await page.waitForFunction(() => /Bot added/.test(document.querySelector('.chanHint').textContent));
+  assert.deepEqual(S.joined, ['C0NOTIN001']);
   await page.selectOption('.chanPick select', 'C0SHARED001');
   assert.match(await page.textContent('.chanHint'), /Shared with the client/);
   await page.screenshot({ path: `${OUT}${name}-1b-channel.png`, fullPage: true });

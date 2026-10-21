@@ -13,6 +13,7 @@
 //                 list channels to pick from (scopes channels:read, groups:read).
 
 import { validateConfig, resultFileName } from '../../src/config.mjs';
+import { explainJoinError } from '../../src/slack.mjs';
 
 const WORKFLOW = 'daily-scan.yml';
 const MODES = new Set(['scan', 'dry-run', 'slack-test']);
@@ -142,6 +143,33 @@ export async function listSlackChannels(token, fetchImpl = fetch) {
   return out.sort((a, b) => Number(b.member) - Number(a.member) || Number(b.shared) - Number(a.shared) || a.name.localeCompare(b.name));
 }
 
+// Puts the bot in the picked channel from the page, so a report never fails
+// on its first day for want of an /invite.
+export async function joinSlackChannel(token, channel, fetchImpl = fetch) {
+  if (!token) {
+    const e = new Error('SLACK_BOT_TOKEN is not set on this Netlify site.');
+    e.status = 400;
+    throw e;
+  }
+  if (!/^[CG][A-Z0-9]{8,}$/.test(String(channel || ''))) {
+    const e = new Error('That is not a Slack channel ID.');
+    e.status = 400;
+    throw e;
+  }
+  const res = await fetchImpl('https://slack.com/api/conversations.join', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ channel }),
+  });
+  const json = await res.json();
+  if (!json.ok) {
+    const e = new Error(explainJoinError(json.error, json.needed));
+    e.status = 400;
+    throw e;
+  }
+  return { joined: true, name: json.channel && json.channel.name };
+}
+
 export async function handle(action, body, gh, { slackToken, fetchImpl } = {}) {
   if (action === 'load') {
     const { data, sha } = await gh.readJson('config.json');
@@ -173,6 +201,8 @@ export async function handle(action, body, gh, { slackToken, fetchImpl } = {}) {
   if (action === 'runs') return { runs: await gh.runs() };
 
   if (action === 'channels') return { channels: await listSlackChannels(slackToken, fetchImpl) };
+
+  if (action === 'joinChannel') return joinSlackChannel(slackToken, body.channel, fetchImpl);
 
   return { status: 400, body: { ok: false, error: `Unknown action ${action}` } };
 }

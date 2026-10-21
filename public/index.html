@@ -430,7 +430,7 @@
 
   function channelHint(c) {
     if (!c) return '';
-    if (!c.member) return 'The bot is not in #' + esc(c.name) + ' yet. In Slack, type <code>/invite @your-bot</code> in that channel, then press Refresh list.';
+    if (!c.member) return 'The bot is not in #' + esc(c.name) + ' yet. <button class="link" type="button" data-act="joinChannel" data-id="' + esc(c.id) + '">Add the bot now</button>';
     if (c.shared) return 'Shared with the client: they will see the daily report here.';
     return 'Internal channel: only your team will see the report.';
   }
@@ -485,7 +485,25 @@
     box.querySelector('[name="slackChannelId"]').value = e.target.value;
     box.querySelector('[name="slackChannelName"]').value = c ? c.name : '';
     box.querySelector('.chanHint').innerHTML = channelHint(c);
+    // Join straight away, so the first report does not fail on not_in_channel.
+    if (c && !c.member) joinChannel(c.id, box);
   });
+
+  function joinChannel(id, box) {
+    var c = (S.channels || []).filter(function (x) { return x.id === id; })[0];
+    var hint = box.querySelector('.chanHint');
+    hint.textContent = 'Adding the bot to ' + (c ? '#' + c.name : 'the channel') + '…';
+    api('joinChannel', { channel: id }).then(function () {
+      if (c) c.member = true;
+      hint.innerHTML = 'Bot added. ' + channelHint(c);
+      // Refresh the option label so it no longer says "bot not invited".
+      var opt = box.querySelector('option[value="' + id + '"]');
+      if (opt && c) opt.textContent = channelLabel(c);
+    }).catch(function (e) {
+      if (e.message === 'pin') return;
+      hint.innerHTML = '<span style="color:var(--red)">' + esc(e.message) + '</span> <button class="link" type="button" data-act="reloadChannels">Refresh list</button>';
+    });
+  }
 
   function readForm(box) {
     var get = function (n) { return box.querySelector('[name="' + n + '"]'); };
@@ -508,6 +526,7 @@
 
     if (a === 'edit') { S.editing = S.editing === domain ? null : domain; render(); return; }
     if (a === 'reloadChannels') { S.channels = null; S.channelsErr = null; loadChannels(); return; }
+    if (a === 'joinChannel') { joinChannel(btn.getAttribute('data-id'), btn.closest('.chanPick')); return; }
     if (a === 'manualChannel') {
       var pick = btn.closest('.chanPick');
       pick.querySelector('select').classList.add('hidden');
