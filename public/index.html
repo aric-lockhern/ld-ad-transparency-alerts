@@ -470,10 +470,10 @@
       var id = btn.getAttribute('data-id');
       var tt = cfg.targets[idx];
       var ids = tt.officialAdvertiserIds || [];
+      // The ID only. Adding the name too meant "Not the client" could never
+      // undo a mis-click: the ID went, the name stayed, and it still matched.
       if (a === 'pin') {
         if (ids.indexOf(id) === -1) ids.push(id);
-        var nm = btn.getAttribute('data-name');
-        if (nm && tt.officialAdvertiserNames.indexOf(nm) === -1) tt.officialAdvertiserNames.push(nm);
       } else {
         ids = ids.filter(function (x) { return x !== id; });
       }

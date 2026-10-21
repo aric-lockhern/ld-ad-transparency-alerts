@@ -15,9 +15,12 @@ screenshots. Read `README.md` for setup.
 - **`src/config.mjs`** validates config for both the page's save and the scan. Change a field there.
 
 ## Invariants
-1. **Fail loud, never read as zero.** No public API exists; `src/transparency.mjs` calls the
-   Transparency Center's internal `SearchCreatives` RPC. A changed response shape throws. A scan
-   that breaks must never post "all clear".
+1. **Fail loud, never read as zero.** No public API exists. `src/transparency.mjs` opens the
+   real Transparency Center page, captures the `SearchCreatives` request *that page* sends, and
+   pages by replaying it. **Never hand-build that request**: the first version did, and Google
+   returned 17 ads from an unrelated agency where its page showed ~2K. A changed response shape
+   throws, paging that repeats throws, and a total under half of Google's printed "~N ads" count
+   throws. A scan that breaks must never post "all clear".
 2. **Failures go to `SLACK_ERROR_CHANNEL`, never a client channel.** Client channels are often
    Slack Connect.
 3. **Dry runs never touch `state/`**, or the first real report loses its "NEW" markers.

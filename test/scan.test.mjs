@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildSearchRequest, parseSearchResponse, searchDomain } from '../src/transparency.mjs';
+import {
+  parseSearchResponse, collectPages, findTokenKey, parseShownCount, assertComplete, parseJsonText, searchPageUrl,
+} from '../src/transparency.mjs';
 import { buildReport, nextState, normaliseName } from '../src/classify.mjs';
 import { summaryMessage, creativeReply, esc } from '../src/slack.mjs';
 import { pickCaptures } from '../src/run.mjs';
@@ -12,42 +14,76 @@ const page2 = JSON.parse(readFileSync(new URL('./fixtures/search-page2.json', im
 const NOW = 1761000000 * 1000;
 const target = { domain: 'directmeds.com', officialAdvertiserNames: ['Direct Meds LLC'], officialAdvertiserIds: [] };
 
-function fakeFetch(pages) {
+// Stands in for the request the Transparency Center page sends; its exact
+// shape is Google's business, the scan only replays it.
+const FIRST_BODY = { 2: 40, 3: { 12: { 1: 'directmeds.com', 2: true } }, 7: { 1: 1 } };
+
+function pager(pages) {
   const bodies = [];
-  const impl = async (url, init) => {
-    bodies.push(JSON.parse(new URLSearchParams(init.body).get('f.req')));
-    const json = pages[bodies.length - 1];
-    return { ok: true, status: 200, text: async () => JSON.stringify(json) };
+  const fetchPage = async (body) => {
+    bodies.push(body);
+    return pages[bodies.length];
   };
-  return { impl, bodies };
+  return { fetchPage, bodies };
 }
 
 async function scan() {
-  const { impl } = fakeFetch([page1, page2]);
-  return searchDomain({ domain: 'directmeds.com', region: 'US', fetchImpl: impl });
+  const { fetchPage } = pager([page1, page2]);
+  return collectPages({ firstBody: FIRST_BODY, firstJson: page1, fetchPage, max: 5000 });
 }
 
-test('request filters by domain and US region', () => {
-  const r = buildSearchRequest({ domain: 'directmeds.com', region: 'US', pageToken: 'T' });
-  assert.deepEqual(r[3][12], { 1: 'directmeds.com', 2: true });
-  assert.deepEqual(r[3][8], [2840]);
-  assert.equal(r[4], 'T');
-  assert.equal(buildSearchRequest({ domain: 'x.com', region: 'anywhere' })[3][8], undefined);
+test('search opens the same page a person would', () => {
+  assert.equal(searchPageUrl('directmeds.com', 'US'), 'https://adstransparency.google.com/?region=US&domain=directmeds.com');
+  assert.equal(searchPageUrl('x.com', 'anywhere'), 'https://adstransparency.google.com/?region=anywhere&domain=x.com');
 });
 
-test('pages through every result using the next-page token', async () => {
-  const { impl, bodies } = fakeFetch([page1, page2]);
-  const { creatives, truncated } = await searchDomain({ domain: 'directmeds.com', region: 'US', fetchImpl: impl });
+test('pages by replaying the page\'s own request with the learned token field', async () => {
+  const { fetchPage, bodies } = pager([page1, page2]);
+  const { creatives, truncated } = await collectPages({ firstBody: FIRST_BODY, firstJson: page1, fetchPage, max: 5000, tokenKey: '9' });
   assert.equal(creatives.length, 5);
   assert.equal(truncated, false);
-  assert.equal(bodies[1][4], 'PAGE2TOKEN');
+  assert.equal(bodies[0][9], 'PAGE2TOKEN');
+  assert.deepEqual(bodies[0][3], FIRST_BODY[3], 'the rest of the request is untouched');
+});
+
+test('the token field is read off the page\'s own second request', () => {
+  assert.equal(findTokenKey(page1, { 2: 40, 3: {}, 9: 'PAGE2TOKEN' }), '9');
+  assert.equal(findTokenKey(page1, { 2: 40 }), null);
+  assert.equal(findTokenKey({}, { 4: 'x' }), null);
+});
+
+test('paging that repeats itself fails instead of looping or under-counting', async () => {
+  const { fetchPage } = pager([page1, page1]);
+  await assert.rejects(
+    collectPages({ firstBody: FIRST_BODY, firstJson: page1, fetchPage, max: 5000 }),
+    /paging is not advancing/,
+  );
 });
 
 test('a cap that cuts the list short is reported, not hidden', async () => {
-  const { impl } = fakeFetch([page1, page2]);
-  const r = await searchDomain({ domain: 'directmeds.com', region: 'US', max: 2, fetchImpl: impl });
+  const { fetchPage } = pager([page1, page2]);
+  const r = await collectPages({ firstBody: FIRST_BODY, firstJson: page1, fetchPage, max: 2 });
   assert.equal(r.creatives.length, 2);
   assert.equal(r.truncated, true);
+});
+
+test('reads Google\'s printed ad count', () => {
+  assert.equal(parseShownCount('directmeds.com\n~2K ads\nAny time'), 2000);
+  assert.equal(parseShownCount('1,234 ads'), 1234);
+  assert.equal(parseShownCount('~1.5K ads'), 1500);
+  assert.equal(parseShownCount('Find the ads you have seen'), null);
+});
+
+test('a scan far short of Google\'s own count fails loudly (the 17-of-~2K bug)', () => {
+  assert.throws(() => assertComplete({ collected: 17, shown: 2000, truncated: false, domain: 'directmeds.com' }), /only read 17/);
+  assert.doesNotThrow(() => assertComplete({ collected: 1600, shown: 2000, truncated: false, domain: 'd' }));
+  assert.doesNotThrow(() => assertComplete({ collected: 17, shown: 2000, truncated: true, domain: 'd' }));
+  assert.doesNotThrow(() => assertComplete({ collected: 17, shown: null, truncated: false, domain: 'd' }));
+});
+
+test('strips Google\'s anti-XSSI prefix', () => {
+  assert.deepEqual(parseJsonText(")]}'\n{\"1\":[]}"), { 1: [] });
+  assert.throws(() => parseJsonText('<html>'), /non-JSON/);
 });
 
 test('parses the creative fields', () => {
@@ -126,6 +162,12 @@ test('reply carries ad copy, or the render failure', () => {
   assert.match(creativeReply(a, c, { ok: true, adText: 'DirectMeds Official <Site>' }), />>> DirectMeds Official &lt;Site&gt;/);
   assert.match(creativeReply(a, c, { ok: false, error: 'timeout' }), /Could not render this ad: timeout/);
   assert.equal(esc('a&b'), 'a&amp;b');
+});
+
+test('ad text cleaner drops rendering script (seen in the first live run)', () => {
+  const junk = "Buscaempleo hoy(function() {const head = document.head;const body = document.getElementById('mys-content');})();";
+  const t = cleanAdText(['#1 Korean Eye Balm - 50% off Today\nAd •\n' + junk]);
+  assert.equal(t, '#1 Korean Eye Balm - 50% off Today\nAd •');
 });
 
 test('ad text cleaner drops page chrome and duplicates', () => {

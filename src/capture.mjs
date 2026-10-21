@@ -21,13 +21,23 @@ const CREATIVE_SELECTORS = [
 
 const CHROME_TEXT = /^(ads transparency center|google|sign in|privacy|terms|about|faq|report ad|see all ads|last shown|first shown|format|region|advertiser|verified|this advertiser|.*cookies.*)$/i;
 
+// Ad iframes carry their rendering script as text nodes, and innerText hands
+// it back as one enormous "line". Nothing an advertiser writes looks like this.
+function looksLikeCode(line) {
+  return (
+    line.length > 300 ||
+    /function\s*\(|=>|\bconst |\bvar |document\.|window\.|JSON\.parse|\}\)\(\)/.test(line) ||
+    (line.match(/[{};=]/g) || []).length > 4
+  );
+}
+
 export function cleanAdText(chunks) {
   const seen = new Set();
   const out = [];
   for (const chunk of chunks) {
     for (const raw of String(chunk || '').split('\n')) {
       const line = raw.replace(/\s+/g, ' ').trim();
-      if (!line || line.length < 2 || CHROME_TEXT.test(line) || seen.has(line)) continue;
+      if (!line || line.length < 2 || CHROME_TEXT.test(line) || looksLikeCode(line) || seen.has(line)) continue;
       seen.add(line);
       out.push(line);
     }
@@ -47,15 +57,24 @@ export async function openBrowser() {
   return { browser, context };
 }
 
-async function adTextFromFrames(page) {
+// Text from the frames inside the ad's own box only. The creative page can
+// hold other iframes too, and reading every frame on it is how one agency's
+// ad came back with a Spanish job listing appended to its copy.
+async function adTextFromFrames(el) {
   const chunks = [];
-  for (const frame of page.frames()) {
-    if (frame === page.mainFrame()) continue;
+  const walk = async (frame) => {
     try {
       chunks.push(await frame.evaluate(() => (document.body ? document.body.innerText : '')));
     } catch {
-      // Cross-origin frames that navigated away mid-read; skip.
+      // A frame that navigated away mid-read; skip.
     }
+    for (const child of frame.childFrames()) await walk(child);
+  };
+  const iframes = await el.locator('iframe').elementHandles().catch(() => []);
+  if ((await el.evaluate((n) => n.tagName).catch(() => '')) === 'IFRAME') iframes.unshift(await el.elementHandle());
+  for (const handle of iframes) {
+    const frame = await handle.contentFrame().catch(() => null);
+    if (frame) await walk(frame);
   }
   return chunks;
 }
@@ -77,7 +96,7 @@ export async function captureCreative(context, creative, outDir) {
       }
     }
 
-    const chunks = await adTextFromFrames(page);
+    const chunks = el ? await adTextFromFrames(el) : [];
     if (el) chunks.push(await el.innerText().catch(() => ''));
     const adText = cleanAdText(chunks);
 

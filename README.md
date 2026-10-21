@@ -113,10 +113,11 @@ The page edits this file, and you can also edit it by hand. Both go through the 
 
 ## How it works, and its limits
 
-- **No official API exists.** The tool calls the same internal endpoint the Transparency Center
-  page calls when you search a website (`SearchService/SearchCreatives`). Google can change it
-  without notice. If the response shape changes, the scan fails loudly instead of reporting
-  "0 advertisers". A silent all-clear would be the worst way for this to break.
+- **No official API exists.** The scan opens the real Transparency Center page for the site in
+  headless Chromium, captures the search request that page sends, and pages through the results
+  with it, so it reads exactly what you see in a browser. It also reads Google's own "~2K ads"
+  count from the page, and if it collected less than half of that it fails loudly instead of
+  reporting. A silent all-clear would be the worst way for this to break.
 - **Screenshots and ad copy** come from rendering each ad's own Transparency Center page in
   headless Chromium. The search results don't include the ad text, so rendering the page is the
   only way to get it.

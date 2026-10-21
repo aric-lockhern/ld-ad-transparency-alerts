@@ -7,7 +7,7 @@ import { REGIONS } from './transparency.mjs';
 export const DEFAULTS = {
   region: 'US',
   activeWithinDays: 7,
-  maxCreativesPerTarget: 2000,
+  maxCreativesPerTarget: 5000,
   maxScreenshotsPerAdvertiser: 3,
   maxScreenshotsPerRun: 25,
   postWhenClean: true,

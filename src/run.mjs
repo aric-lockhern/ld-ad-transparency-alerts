@@ -6,7 +6,7 @@
 //   node src/run.mjs --dry-run            scan, print the Slack messages, post nothing
 //   node src/run.mjs --slack-test         post a "connected" line to each channel, no scan
 //   node src/run.mjs --only=directmeds.com
-//   node src/run.mjs --no-screenshots
+//   node src/run.mjs --no-screenshots     scan without taking screenshots
 //
 // Every scan, dry or real, writes results/<domain>.json. That file is what the
 // setup page shows — including the advertiser IDs needed to pin the official
@@ -113,11 +113,15 @@ async function scanTarget(target, config, slack, browserCtx) {
   }
 
   const prevState = await readJson(stateFile(target), null);
-  const { creatives, truncated } = await searchDomain({
+  const { creatives, truncated, shown, tokenKey, requestBody } = await searchDomain({
+    context: browserCtx,
     domain: target.domain,
     region,
     max: config.maxCreativesPerTarget,
   });
+  console.log(`${target.domain}: Google's page shows ${shown == null ? 'no count' : `~${shown} ads`}; read ${creatives.length}` +
+    `${truncated ? ' (stopped at the cap)' : ''}; paging field ${tokenKey}`);
+  console.log(`  request: ${JSON.stringify(requestBody).slice(0, 400)}`);
   const report = buildReport({ target, creatives, prevState, activeWithinDays: config.activeWithinDays });
 
   console.log(
@@ -134,7 +138,7 @@ async function scanTarget(target, config, slack, browserCtx) {
 
   const shouldPost = report.unofficial.length || config.postWhenClean;
   const summary = summaryMessage(report, { region, truncated });
-  const captures = SHOTS && browserCtx ? pickCaptures(report, config.maxScreenshotsPerAdvertiser, config.maxScreenshotsPerRun) : [];
+  const captures = SHOTS ? pickCaptures(report, config.maxScreenshotsPerAdvertiser, config.maxScreenshotsPerRun) : [];
 
   let threadTs = null;
   if (shouldPost) {
@@ -187,9 +191,10 @@ async function main() {
   if (!DRY && !token) throw new Error('SLACK_BOT_TOKEN is not set (use --dry-run to test without Slack)');
   const slack = token ? new Slack(token) : null;
 
+  // The search itself runs in the browser now, so every scan needs one.
   let browser = null;
   let context = null;
-  if (SHOTS) {
+  if (!SLACK_TEST) {
     const { openBrowser } = await import('./capture.mjs');
     ({ browser, context } = await openBrowser());
   }
