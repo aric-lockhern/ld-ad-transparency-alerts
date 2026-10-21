@@ -1,0 +1,42 @@
+name: Probe Transparency Center (diagnostic)
+
+# Shows exactly what Google serves the GitHub runner for a domain, and how the
+# search request behaves with one thing changed at a time. Posts nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 'Domain to probe'
+        type: string
+        default: directmeds.com
+      region:
+        description: 'Region (US, CA, GB, AU, anywhere)'
+        type: string
+        default: US
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - run: node scripts/probe.mjs "$DOMAIN" "$REGION"
+        env:
+          DOMAIN: ${{ inputs.domain }}
+          REGION: ${{ inputs.region }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-${{ github.run_id }}
+          path: out/probe/
+          retention-days: 14
