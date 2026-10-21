@@ -10,8 +10,13 @@
       "name": "DirectMeds",
       "domain": "directmeds.com",
       "enabled": true,
-      "officialAdvertiserNames": ["Direct Meds LLC"],
-      "officialAdvertiserIds": [],
+      "officialAdvertiserNames": [
+        "Direct Meds LLC",
+        "Idea Clan , Inc"
+      ],
+      "officialAdvertiserIds": [
+        "AR11773855283737001985"
+      ],
       "slackChannelId": ""
     }
   ]
