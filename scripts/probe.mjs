@@ -104,7 +104,10 @@ try {
       const r = await page.request.post(first.url, { headers, data: new URLSearchParams({ 'f.req': JSON.stringify(body) }).toString() });
       const t = await r.text();
       if (!r.ok()) return `HTTP ${r.status()}: ${t.slice(0, 200)}`;
-      try { return summarise(parseJsonText(t)); } catch (e) { return e.message; }
+      try {
+        const j = parseJsonText(t);
+        return `${summarise(j)} totals 4=${JSON.stringify(j[4])} 5=${JSON.stringify(j[5])}`;
+      } catch (e) { return e.message; }
     };
     const clone = () => JSON.parse(JSON.stringify(first.body));
     const filter = (b) => b[3] || {};
@@ -118,6 +121,11 @@ try {
       ['www. prefix, flag false', (b) => { const k = domainKey(b); if (k && filter(b)[k]) { filter(b)[k][1] = `www.${domain}`; filter(b)[k][2] = false; } return b; }],
       ['no region filter', (b) => { delete filter(b)[8]; if (b[7]) { delete b[7][3]; } return b; }],
       ['page size 100', (b) => { b[2] = 100; return b; }],
+      // Seen in a signed-in browser that shows ~2K ads where anonymous shows 17.
+      ['7.2 = 38 (signed-in browser value)', (b) => { b[7] = { ...(b[7] || {}), 2: 38 }; return b; }],
+      ['7.2 = 38, page size 20 (signed-in body exactly)', (b) => { b[2] = 20; b[7] = { ...(b[7] || {}), 2: 38 }; return b; }],
+      ['7.2 = 1', (b) => { b[7] = { ...(b[7] || {}), 2: 1 }; return b; }],
+      ['7.2 removed', (b) => { if (b[7]) delete b[7][2]; return b; }],
     ];
     console.log('\nVariants (one change each):');
     for (const [name, fn] of variants) {
