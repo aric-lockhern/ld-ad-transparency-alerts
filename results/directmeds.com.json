@@ -2,7 +2,7 @@
   "domain": "directmeds.com",
   "name": "DirectMeds",
   "ok": false,
-  "scannedAt": "2026-10-22T19:48:01.675Z",
+  "scannedAt": "2026-10-23T19:49:50.563Z",
   "dryRun": false,
   "error": "The saved Google session is signed out, so the Transparency Center would only show the anonymous view (a fraction of the ads). Export fresh cookies into the GOOGLE_COOKIES secret — see README, \"Signed-in scanning\"."
 }
